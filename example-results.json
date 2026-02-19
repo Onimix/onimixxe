@@ -1,0 +1,46 @@
+{
+  "bizCode": 0,
+  "data": {
+    "tournaments": [
+      {
+        "events": [
+          {
+            "estimateStartTime": 1708330800000,
+            "setScore": "2-1",
+            "homeTeamName": "Bayern Munich",
+            "awayTeamName": "Dortmund",
+            "matchStatus": "End"
+          },
+          {
+            "estimateStartTime": 1708334400000,
+            "setScore": "3-0",
+            "homeTeamName": "RB Leipzig",
+            "awayTeamName": "Leverkusen",
+            "matchStatus": "End"
+          },
+          {
+            "estimateStartTime": 1708338000000,
+            "setScore": "1-1",
+            "homeTeamName": "Frankfurt",
+            "awayTeamName": "Stuttgart",
+            "matchStatus": "End"
+          },
+          {
+            "estimateStartTime": 1708341600000,
+            "setScore": "0-0",
+            "homeTeamName": "Union Berlin",
+            "awayTeamName": "Mönchengladbach",
+            "matchStatus": "End"
+          },
+          {
+            "estimateStartTime": 1708345200000,
+            "setScore": "4-2",
+            "homeTeamName": "Leverkusen",
+            "awayTeamName": "Bayern Munich",
+            "matchStatus": "End"
+          }
+        ]
+      }
+    ]
+  }
+}
