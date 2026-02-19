@@ -1,0 +1,226 @@
+import { createClient } from '@supabase/supabase-js';
+import type { Result, Odds } from './types';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
+
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// Results operations
+export async function insertResults(results: Omit<Result, 'id' | 'created_at'>[]): Promise<{ success: boolean; error?: string; count: number }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized', count: 0 };
+  }
+
+  try {
+    // Use upsert to handle duplicates
+    const { data, error } = await supabase
+      .from('results')
+      .upsert(results, { 
+        onConflict: 'block_time,home_team,away_team,home_goals,away_goals',
+        ignoreDuplicates: true 
+      })
+      .select();
+
+    if (error) {
+      console.error('Error inserting results:', error);
+      return { success: false, error: error.message, count: 0 };
+    }
+
+    return { success: true, count: results.length };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting results:', errorMessage);
+    return { success: false, error: errorMessage, count: 0 };
+  }
+}
+
+export async function getAllResults(): Promise<Result[]> {
+  if (!supabase) {
+    console.warn('Supabase client not initialized');
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching results:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching results:', error);
+    return [];
+  }
+}
+
+export async function getResultsByBlockTime(blockTime: string): Promise<Result[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('*')
+      .eq('block_time', blockTime);
+
+    if (error) {
+      console.error('Error fetching results by block time:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching results by block time:', error);
+    return [];
+  }
+}
+
+export async function getResultsByTeam(teamName: string): Promise<Result[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('*')
+      .or(`home_team.ilike.%${teamName}%,away_team.ilike.%${teamName}%`);
+
+    if (error) {
+      console.error('Error fetching results by team:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching results by team:', error);
+    return [];
+  }
+}
+
+// Odds operations
+export async function insertOdds(oddsList: Omit<Odds, 'id' | 'created_at'>[]): Promise<{ success: boolean; error?: string; count: number }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized', count: 0 };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('odds')
+      .insert(oddsList)
+      .select();
+
+    if (error) {
+      console.error('Error inserting odds:', error);
+      return { success: false, error: error.message, count: 0 };
+    }
+
+    return { success: true, count: oddsList.length };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting odds:', errorMessage);
+    return { success: false, error: errorMessage, count: 0 };
+  }
+}
+
+export async function getAllOdds(): Promise<Odds[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('odds')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching odds:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching odds:', error);
+    return [];
+  }
+}
+
+export async function clearOdds(): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('odds')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      console.error('Error clearing odds:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error clearing odds:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+// Statistics
+export async function getHistoricalStats(): Promise<{
+  totalMatches: number;
+  avgGoals: number;
+  over15Rate: number;
+  over25Rate: number;
+}> {
+  if (!supabase) {
+    return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('total_goals, over_15, over_25');
+
+    if (error) {
+      console.error('Error fetching historical stats:', error);
+      return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
+    }
+
+    if (!data || data.length === 0) {
+      return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
+    }
+
+    const totalMatches = data.length;
+    const totalGoals = data.reduce((sum, row) => sum + row.total_goals, 0);
+    const over15Count = data.filter(row => row.over_15).length;
+    const over25Count = data.filter(row => row.over_25).length;
+
+    return {
+      totalMatches,
+      avgGoals: totalGoals / totalMatches,
+      over15Rate: (over15Count / totalMatches) * 100,
+      over25Rate: (over25Count / totalMatches) * 100,
+    };
+  } catch (error) {
+    console.error('Error calculating historical stats:', error);
+    return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
+  }
+}
