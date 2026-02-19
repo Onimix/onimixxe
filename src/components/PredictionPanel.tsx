@@ -96,6 +96,12 @@ export default function PredictionPanel({ predictions }: PredictionPanelProps) {
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
+                <div className="text-xs text-gray-500 uppercase">Team Over 1.5 Rate</div>
+                <div className="text-xl font-bold text-gray-800">
+                  {prediction.teamStats.over15Rate.toFixed(1)}%
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
                 <div className="text-xs text-gray-500 uppercase">Prediction</div>
                 <div className={`text-xl font-bold ${
                   prediction.prediction === 'OVER 1.5' ? 'text-green-600' : 'text-red-600'
