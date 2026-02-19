@@ -61,6 +61,7 @@ export interface TeamStats {
   avgScored: number;
   avgConceded: number;
   matchesPlayed: number;
+  over15Rate: number;
 }
 
 export interface Prediction {

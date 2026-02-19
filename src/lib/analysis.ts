@@ -20,20 +20,25 @@ export function parseScore(score: string): { homeGoals: number; awayGoals: numbe
 }
 
 // Calculate team statistics
-export function calculateTeamStats(results: Result[], teamName: string): TeamStats {
+export function calculateTeamStats(results: Result[], teamName: string): TeamStats & { over15Rate: number } {
   const teamMatches = results.filter(
     r => r.home_team.toLowerCase() === teamName.toLowerCase() ||
          r.away_team.toLowerCase() === teamName.toLowerCase()
   );
 
   if (teamMatches.length === 0) {
-    return { avgScored: 0, avgConceded: 0, matchesPlayed: 0 };
+    return { avgScored: 0, avgConceded: 0, matchesPlayed: 0, over15Rate: 0 };
   }
 
   let goalsScored = 0;
   let goalsConceded = 0;
+  let over15Count = 0;
 
   teamMatches.forEach(match => {
+    if (match.over_15) {
+      over15Count++;
+    }
+    
     if (match.home_team.toLowerCase() === teamName.toLowerCase()) {
       goalsScored += match.home_goals;
       goalsConceded += match.away_goals;
@@ -47,6 +52,7 @@ export function calculateTeamStats(results: Result[], teamName: string): TeamSta
     avgScored: goalsScored / teamMatches.length,
     avgConceded: goalsConceded / teamMatches.length,
     matchesPlayed: teamMatches.length,
+    over15Rate: (over15Count / teamMatches.length) * 100,
   };
 }
 
@@ -85,10 +91,25 @@ export function analyzeMatch(
   // Calculate average team stats
   const teamAvgScored = (homeTeamStats.avgScored + awayTeamStats.avgScored) / 2;
   const teamAvgConceded = (homeTeamStats.avgConceded + awayTeamStats.avgConceded) / 2;
+  const teamAvgOver15Rate = (homeTeamStats.over15Rate + awayTeamStats.over15Rate) / 2;
 
-  // Decision rules
-  const isSafe = historicalStats.over15Rate >= 75 && historicalStats.avgGoals >= 2.2;
-  const isModerate = historicalStats.over15Rate >= 60 && historicalStats.avgGoals >= 1.8;
+  // Calculate expected goals based on team stats
+  const expectedGoals = teamAvgScored + teamAvgConceded;
+  
+  // Decision rules - combine block time stats and team performance
+  const isSafe = 
+    historicalStats.over15Rate >= 75 && 
+    historicalStats.avgGoals >= 2.2 && 
+    expectedGoals >= 2.0 &&
+    teamAvgOver15Rate >= 65 &&
+    historicalStats.totalMatches >= 10;
+    
+  const isModerate = 
+    historicalStats.over15Rate >= 60 && 
+    historicalStats.avgGoals >= 1.8 && 
+    expectedGoals >= 1.5 &&
+    teamAvgOver15Rate >= 55 &&
+    historicalStats.totalMatches >= 5;
   
   let prediction: 'OVER 1.5' | 'LOW CONFIDENCE';
   let confidence: number;
@@ -96,15 +117,15 @@ export function analyzeMatch(
 
   if (isSafe) {
     prediction = 'OVER 1.5';
-    confidence = Math.min(95, Math.round(historicalStats.over15Rate + 10));
+    confidence = Math.min(95, Math.round(historicalStats.over15Rate));
     status = 'SAFE';
   } else if (isModerate) {
     prediction = 'OVER 1.5';
-    confidence = Math.min(75, Math.round(historicalStats.over15Rate));
+    confidence = Math.round(historicalStats.over15Rate);
     status = 'MODERATE';
   } else {
     prediction = 'LOW CONFIDENCE';
-    confidence = Math.max(0, Math.round(50 - (75 - historicalStats.over15Rate)));
+    confidence = Math.max(0, Math.round(historicalStats.over15Rate));
     status = 'RISKY';
   }
 
@@ -115,6 +136,7 @@ export function analyzeMatch(
       avgScored: teamAvgScored,
       avgConceded: teamAvgConceded,
       matchesPlayed: Math.min(homeTeamStats.matchesPlayed, awayTeamStats.matchesPlayed),
+      over15Rate: teamAvgOver15Rate,
     },
     prediction,
     confidence,
