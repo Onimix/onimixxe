@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { insertResults } from '@/lib/supabase';
-import { validateSportyJson, timestampToBlockTime, parseScore } from '@/lib/analysis';
+import { validateSportyJson, timestampToBlockTime, parseScore, parseResultsInput } from '@/lib/analysis';
 import type { SportyResponse, ParsedResult } from '@/lib/types';
 
 interface JsonUploaderProps {
@@ -13,6 +13,7 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const processFiles = async (files: FileList | null) => {
@@ -24,61 +25,85 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
     let totalProcessed = 0;
 
     for (const file of Array.from(files)) {
-      if (!file.name.endsWith('.json')) {
-        setMessage({ type: 'error', text: `File "${file.name}" is not a JSON file` });
+      const isJson = file.name.endsWith('.json');
+      const isTxt = file.name.endsWith('.txt');
+      
+      if (!isJson && !isTxt) {
+        setMessage({ type: 'error', text: `File "${file.name}" must be .json or .txt` });
         setIsLoading(false);
         return;
       }
 
       try {
         const text = await file.text();
-        let jsonData: unknown;
-
-        try {
-          jsonData = JSON.parse(text);
-        } catch {
-          setMessage({ type: 'error', text: `Invalid JSON in file "${file.name}"` });
-          setIsLoading(false);
-          return;
-        }
-
-        const validation = validateSportyJson(jsonData);
-        if (!validation.valid) {
-          setMessage({ type: 'error', text: validation.error || `Invalid structure in "${file.name}"` });
-          setIsLoading(false);
-          return;
-        }
-
-        const sportyData = jsonData as SportyResponse;
-        const parsedResults: ParsedResult[] = [];
-
-        for (const tournament of sportyData.data.tournaments) {
-          for (const match of tournament.events) {
-            // Only process completed matches
-            if (match.matchStatus !== 'End') continue;
-
-            const { homeGoals, awayGoals } = parseScore(match.setScore);
-            const totalGoals = homeGoals + awayGoals;
-
-            parsedResults.push({
-              block_time: timestampToBlockTime(match.estimateStartTime),
-              home_team: match.homeTeamName,
-              away_team: match.awayTeamName,
-              home_goals: homeGoals,
-              away_goals: awayGoals,
-              total_goals: totalGoals,
-              over_15: totalGoals >= 2,
-              over_25: totalGoals >= 3,
-            });
+        
+        if (isTxt) {
+          // Parse tab-separated format
+          const parseResult = parseResultsInput(text);
+          if (!parseResult.valid) {
+            setMessage({ type: 'error', text: parseResult.error || `Invalid format in "${file.name}"` });
+            setIsLoading(false);
+            return;
           }
-        }
 
-        if (parsedResults.length > 0) {
-          const result = await insertResults(parsedResults);
-          if (result.success) {
-            totalProcessed += parsedResults.length;
-          } else {
-            console.error('Error inserting results:', result.error);
+          if (parseResult.data && parseResult.data.length > 0) {
+            const result = await insertResults(parseResult.data);
+            if (result.success) {
+              totalProcessed += parseResult.data.length;
+            } else {
+              console.error('Error inserting results:', result.error);
+            }
+          }
+        } else {
+          // Parse JSON format
+          let jsonData: unknown;
+
+          try {
+            jsonData = JSON.parse(text);
+          } catch {
+            setMessage({ type: 'error', text: `Invalid JSON in file "${file.name}"` });
+            setIsLoading(false);
+            return;
+          }
+
+          const validation = validateSportyJson(jsonData);
+          if (!validation.valid) {
+            setMessage({ type: 'error', text: validation.error || `Invalid structure in "${file.name}"` });
+            setIsLoading(false);
+            return;
+          }
+
+          const sportyData = jsonData as SportyResponse;
+          const parsedResults: ParsedResult[] = [];
+
+          for (const tournament of sportyData.data.tournaments) {
+            for (const match of tournament.events) {
+              // Only process completed matches
+              if (match.matchStatus !== 'End') continue;
+
+              const { homeGoals, awayGoals } = parseScore(match.setScore);
+              const totalGoals = homeGoals + awayGoals;
+
+              parsedResults.push({
+                block_time: timestampToBlockTime(match.estimateStartTime),
+                home_team: match.homeTeamName,
+                away_team: match.awayTeamName,
+                home_goals: homeGoals,
+                away_goals: awayGoals,
+                total_goals: totalGoals,
+                over_15: totalGoals >= 2,
+                over_25: totalGoals >= 3,
+              });
+            }
+          }
+
+          if (parsedResults.length > 0) {
+            const result = await insertResults(parsedResults);
+            if (result.success) {
+              totalProcessed += parsedResults.length;
+            } else {
+              console.error('Error inserting results:', result.error);
+            }
           }
         }
       } catch (error) {
@@ -97,6 +122,38 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
     } else {
       setMessage({ type: 'error', text: 'No valid matches found in the uploaded files' });
     }
+  };
+
+  const handlePaste = async () => {
+    if (!pasteText.trim()) {
+      setMessage({ type: 'error', text: 'Please paste some data first' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage(null);
+
+    const parseResult = parseResultsInput(pasteText);
+    if (!parseResult.valid) {
+      setMessage({ type: 'error', text: parseResult.error || 'Invalid format' });
+      setIsLoading(false);
+      return;
+    }
+
+    if (parseResult.data && parseResult.data.length > 0) {
+      const result = await insertResults(parseResult.data);
+      if (result.success) {
+        setMessage({ type: 'success', text: `Successfully processed ${parseResult.data.length} matches!` });
+        onUploadComplete(parseResult.data.length);
+        setPasteText('');
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to insert results' });
+      }
+    } else {
+      setMessage({ type: 'error', text: 'No valid matches found' });
+    }
+
+    setIsLoading(false);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -143,7 +200,7 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
         <input
           ref={inputRef}
           type="file"
-          accept=".json"
+          accept=".json,.txt"
           multiple
           onChange={handleChange}
           className="hidden"
@@ -151,10 +208,10 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
         <div className="space-y-2">
           <div className="text-4xl">📁</div>
           <div className="text-lg font-medium text-gray-700">
-            {isLoading ? 'Processing...' : 'Drop JSON files here or click to upload'}
+            {isLoading ? 'Processing...' : 'Drop files here or click to upload'}
           </div>
           <div className="text-sm text-gray-500">
-            Accepts multiple .json files (Sporty vFootball format)
+            Accepts .json (Sporty format) or .txt (tab-separated)
           </div>
         </div>
       </div>
@@ -170,6 +227,27 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
           {message.text}
         </div>
       )}
+
+      {/* Paste Input Section */}
+      <div className="mt-6">
+        <div className="text-sm font-medium text-gray-700 mb-2">Or paste results directly:</div>
+        <div className="text-xs text-gray-500 mb-2">Format: Time[tab]TeamA Goal-Goal TeamB (one per line)</div>
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          placeholder="08:24	LEV 0-2 HSV
+08:24	MAI 4-0 SCF
+08:24	STP 0-0 SGE"
+          className="w-full h-32 p-3 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        <button
+          onClick={handlePaste}
+          disabled={isLoading || !pasteText.trim()}
+          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoading ? 'Processing...' : 'Paste Results'}
+        </button>
+      </div>
     </div>
   );
 }

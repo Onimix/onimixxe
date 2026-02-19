@@ -1,4 +1,4 @@
-import type { Result, ParsedOdds, Prediction, HistoricalStats, TeamStats } from './types';
+import type { Result, ParsedOdds, Prediction, HistoricalStats, TeamStats, ParsedResult } from './types';
 
 // Convert timestamp to block time (HH:MM format)
 export function timestampToBlockTime(timestamp: number): string {
@@ -215,4 +215,71 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
   }
 
   return { valid: true, data: parsedOdds };
+}
+
+// Parse tab-separated results input (e.g., "08:24\tLEV 0-2 HSV")
+export function parseResultsInput(input: string): { valid: boolean; data?: ParsedResult[]; error?: string } {
+  const lines = input.trim().split('\n');
+  const parsedResults: ParsedResult[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Split by tab to get time and result
+    const parts = line.split('\t');
+    if (parts.length < 2) {
+      return { valid: false, error: `Line ${i + 1}: Missing tab separator between time and result` };
+    }
+
+    const blockTime = parts[0].trim();
+    const result = parts[1].trim();
+
+    // Parse result "LEV 0-2 HSV" to get teams and score
+    // Format: TEAM_A GOAL-GOAL TEAM_B
+    const resultParts = result.split(/\s+/);
+    if (resultParts.length !== 3) {
+      return { valid: false, error: `Line ${i + 1}: Invalid result format. Expected "TEAM GOAL-GOAL TEAM"` };
+    }
+
+    const homeTeam = resultParts[0];
+    const score = resultParts[1];
+    const awayTeam = resultParts[2];
+
+    // Parse score "0-2" to goals
+    const scoreParts = score.split('-');
+    if (scoreParts.length !== 2) {
+      return { valid: false, error: `Line ${i + 1}: Invalid score format. Expected "GOAL-GOAL"` };
+    }
+
+    const homeGoals = parseInt(scoreParts[0], 10);
+    const awayGoals = parseInt(scoreParts[1], 10);
+
+    if (isNaN(homeGoals) || isNaN(awayGoals)) {
+      return { valid: false, error: `Line ${i + 1}: Invalid score values` };
+    }
+
+    if (!blockTime || !homeTeam || !awayTeam) {
+      return { valid: false, error: `Line ${i + 1}: Missing required fields` };
+    }
+
+    const totalGoals = homeGoals + awayGoals;
+
+    parsedResults.push({
+      block_time: blockTime,
+      home_team: homeTeam,
+      away_team: awayTeam,
+      home_goals: homeGoals,
+      away_goals: awayGoals,
+      total_goals: totalGoals,
+      over_15: totalGoals >= 2,
+      over_25: totalGoals >= 3,
+    });
+  }
+
+  if (parsedResults.length === 0) {
+    return { valid: false, error: 'No valid data rows found' };
+  }
+
+  return { valid: true, data: parsedResults };
 }
