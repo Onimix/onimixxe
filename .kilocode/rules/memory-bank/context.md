@@ -77,3 +77,5 @@ The code supports both `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_SUPABASE
 | 2026-02-19 | Pushed to GitHub: https://github.com/Onimix/ONIMIXXE.git |
 | 2026-02-20 | Fixed build error: Added URL validation for missing env vars |
 | 2026-02-20 | Added support for PUBLISHABLE_DEFAULT_KEY env variable |
+| 2026-02-20 | Docs: Update context.md with deployment configuration |
+| 2026-02-20 | Added powerful 5D rotating flames around dashboard edges |
