@@ -1,6 +1,10 @@
 -- Supabase Schema for ONIMIX Eagle Eye Pick
 -- Run this SQL in your Supabase SQL Editor
 
+-- Drop existing tables if needed (WARNING: This will delete all data)
+-- DROP TABLE IF EXISTS odds;
+-- DROP TABLE IF EXISTS results;
+
 -- Results table for storing historical match results
 CREATE TABLE IF NOT EXISTS results (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -33,17 +37,43 @@ CREATE TABLE IF NOT EXISTS odds (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create index for faster queries
+-- Create indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_results_block_time ON results (block_time);
 CREATE INDEX IF NOT EXISTS idx_odds_block_time ON odds (block_time);
+CREATE INDEX IF NOT EXISTS idx_results_created_at ON results (created_at);
+CREATE INDEX IF NOT EXISTS idx_odds_created_at ON odds (created_at);
 
--- Enable Row Level Security (optional - can be disabled for demo)
+-- =====================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =====================================================
+-- These policies allow full public access for the anon key
+-- For production, you may want to restrict this
+
+-- Disable RLS first (simplest approach for demo/public apps)
+ALTER TABLE results DISABLE ROW LEVEL SECURITY;
+ALTER TABLE odds DISABLE ROW LEVEL SECURITY;
+
+-- OR if you prefer to keep RLS enabled, use these policies:
+-- Enable RLS
 -- ALTER TABLE results ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE odds ENABLE ROW LEVEL SECURITY;
 
--- Create policy for public access (adjust as needed for production)
--- DROP POLICY IF EXISTS "Allow public read results" ON results;
--- CREATE POLICY "Allow public read results" ON results FOR SELECT USING (true);
+-- Results: Allow all operations for anon key
+-- DROP POLICY IF EXISTS "Allow all on results" ON results;
+-- CREATE POLICY "Allow all on results" ON results FOR ALL USING (true) WITH CHECK (true);
 
--- DROP POLICY IF EXISTS "Allow public read odds" ON odds;
--- CREATE POLICY "Allow public read odds" ON odds FOR SELECT USING (true);
+-- Odds: Allow all operations for anon key
+-- DROP POLICY IF EXISTS "Allow all on odds" ON odds;
+-- CREATE POLICY "Allow all on odds" ON odds FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- GRANT PERMISSIONS (Important for anon key access)
+-- =====================================================
+GRANT ALL ON results TO anon;
+GRANT ALL ON results TO authenticated;
+GRANT ALL ON odds TO anon;
+GRANT ALL ON odds TO authenticated;
+
+-- Grant sequence permissions for UUID generation
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;

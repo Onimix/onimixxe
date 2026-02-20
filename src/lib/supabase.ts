@@ -62,17 +62,38 @@ export async function getAllResults(): Promise<Result[]> {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('results')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Fetch all results using pagination (Supabase default limit is 1000)
+    const allResults: Result[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from('results')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    if (error) {
-      console.error('Error fetching results:', error);
-      return [];
+      if (error) {
+        console.error('Error fetching results:', error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allResults.push(...data);
+
+      // If we got less than pageSize, we've reached the end
+      if (data.length < pageSize) {
+        break;
+      }
+
+      page++;
     }
 
-    return data || [];
+    return allResults;
   } catch (error) {
     console.error('Error fetching results:', error);
     return [];
@@ -209,23 +230,43 @@ export async function getHistoricalStats(): Promise<{
   }
 
   try {
-    const { data, error } = await supabase
-      .from('results')
-      .select('total_goals, over_15, over_25');
+    // Fetch all results using pagination for accurate stats
+    const allData: Array<{ total_goals: number; over_15: boolean; over_25: boolean }> = [];
+    let page = 0;
+    const pageSize = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from('results')
+        .select('total_goals, over_15, over_25')
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    if (error) {
-      console.error('Error fetching historical stats:', error);
+      if (error) {
+        console.error('Error fetching historical stats:', error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allData.push(...data);
+
+      if (data.length < pageSize) {
+        break;
+      }
+
+      page++;
+    }
+
+    if (allData.length === 0) {
       return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
     }
 
-    if (!data || data.length === 0) {
-      return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
-    }
-
-    const totalMatches = data.length;
-    const totalGoals = data.reduce((sum, row) => sum + row.total_goals, 0);
-    const over15Count = data.filter(row => row.over_15).length;
-    const over25Count = data.filter(row => row.over_25).length;
+    const totalMatches = allData.length;
+    const totalGoals = allData.reduce((sum, row) => sum + row.total_goals, 0);
+    const over15Count = allData.filter(row => row.over_15).length;
+    const over25Count = allData.filter(row => row.over_25).length;
 
     return {
       totalMatches,
