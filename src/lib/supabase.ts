@@ -2,7 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { Result, Odds } from './types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Support both anon key and publishable key variable names
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+                    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
 // Validate URL format before creating client
 function isValidUrl(url: string | undefined): url is string {
@@ -16,12 +18,12 @@ function isValidUrl(url: string | undefined): url is string {
 }
 
 // Only create client if both variables are valid
-export const supabase = isValidUrl(supabaseUrl) && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = isValidUrl(supabaseUrl) && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey)
   : null;
 
 if (!supabase) {
-  console.warn('Missing or invalid Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  console.warn('Missing or invalid Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)');
 }
 
 // Results operations
