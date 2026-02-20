@@ -79,3 +79,4 @@ The code supports both `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_SUPABASE
 | 2026-02-20 | Added support for PUBLISHABLE_DEFAULT_KEY env variable |
 | 2026-02-20 | Docs: Update context.md with deployment configuration |
 | 2026-02-20 | Added powerful 5D rotating flames around dashboard edges |
+| 2026-02-20 | Replaced flames with Matrix rain effect (tiny falling code on all 4 edges) |
