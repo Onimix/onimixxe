@@ -36,30 +36,20 @@ The ONIMIX Eagle Eye Pick analytics engine is complete and ready for deployment.
 
 ## Current Focus
 
-The application is complete and ready for deployment. Next steps:
+The application is deployed and in production. Supabase is configured at `zalplokogrvqkivrqlsn.supabase.co`.
 
-1. Set up Supabase project and run schema.sql
-2. Configure environment variables in Vercel
-3. Deploy to Vercel
+## Deployment Configuration
 
-## Deployment Instructions
+### Supabase Project
+- **Project URL**: `https://zalplokogrvqkivrqlsn.supabase.co`
+- **Schema**: `supabase/schema.sql` has been applied
 
-### 1. Setup Supabase
-- Create a new Supabase project
-- Run `supabase/schema.sql` in the SQL Editor
-- Get the URL and anon key
-
-### 2. Environment Variables
+### Environment Variables (Vercel)
 Set these in Vercel:
-- `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase anon key
+- `NEXT_PUBLIC_SUPABASE_URL` = `https://zalplokogrvqkivrqlsn.supabase.co`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` = your publishable key
 
-### 3. Deploy
-```bash
-git add -A
-git commit -m "ONIMIX Eagle Eye Pick - Production Ready"
-git push
-```
+The code supports both `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` variable names.
 
 ## Features
 
@@ -85,3 +75,5 @@ git push
 | Initial | Template created with base setup |
 | 2026-02-19 | ONIMIX Eagle Eye Pick analytics engine complete |
 | 2026-02-19 | Pushed to GitHub: https://github.com/Onimix/ONIMIXXE.git |
+| 2026-02-20 | Fixed build error: Added URL validation for missing env vars |
+| 2026-02-20 | Added support for PUBLISHABLE_DEFAULT_KEY env variable |
