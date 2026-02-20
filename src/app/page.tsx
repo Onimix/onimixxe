@@ -9,92 +9,51 @@ import { getAllResults, getAllOdds, getHistoricalStats } from '@/lib/supabase';
 import { analyzeMatch } from '@/lib/analysis';
 import type { Result, Odds, HistoricalStats, Prediction } from '@/lib/types';
 
-// Flame elements for edges - varying speeds and sizes for 5D effect
-const flameElements = [
-  // Top edge flames - fast rotation
-  { position: 'top', left: '0%', size: 80, speed: 0.8, delay: 0, intensity: 1 },
-  { position: 'top', left: '5%', size: 60, speed: 1.2, delay: 0.1, intensity: 0.9 },
-  { position: 'top', left: '10%', size: 90, speed: 0.6, delay: 0.2, intensity: 1 },
-  { position: 'top', left: '15%', size: 50, speed: 1.5, delay: 0.3, intensity: 0.8 },
-  { position: 'top', left: '20%', size: 70, speed: 0.9, delay: 0.15, intensity: 0.95 },
-  { position: 'top', left: '25%', size: 85, speed: 0.7, delay: 0.25, intensity: 1 },
-  { position: 'top', left: '30%', size: 55, speed: 1.3, delay: 0.05, intensity: 0.85 },
-  { position: 'top', left: '35%', size: 75, speed: 0.85, delay: 0.35, intensity: 0.9 },
-  { position: 'top', left: '40%', size: 95, speed: 0.5, delay: 0.1, intensity: 1 },
-  { position: 'top', left: '45%', size: 65, speed: 1.1, delay: 0.2, intensity: 0.88 },
-  { position: 'top', left: '50%', size: 100, speed: 0.55, delay: 0, intensity: 1 },
-  { position: 'top', left: '55%', size: 70, speed: 0.95, delay: 0.15, intensity: 0.92 },
-  { position: 'top', left: '60%', size: 85, speed: 0.65, delay: 0.3, intensity: 1 },
-  { position: 'top', left: '65%', size: 60, speed: 1.4, delay: 0.08, intensity: 0.87 },
-  { position: 'top', left: '70%', size: 90, speed: 0.75, delay: 0.22, intensity: 0.95 },
-  { position: 'top', left: '75%', size: 55, speed: 1.25, delay: 0.12, intensity: 0.83 },
-  { position: 'top', left: '80%', size: 80, speed: 0.8, delay: 0.28, intensity: 0.98 },
-  { position: 'top', left: '85%', size: 65, speed: 1.0, delay: 0.18, intensity: 0.9 },
-  { position: 'top', left: '90%', size: 95, speed: 0.6, delay: 0.05, intensity: 1 },
-  { position: 'top', left: '95%', size: 75, speed: 0.85, delay: 0.32, intensity: 0.93 },
-  // Bottom edge flames
-  { position: 'bottom', left: '0%', size: 75, speed: 0.9, delay: 0.1, intensity: 0.95 },
-  { position: 'bottom', left: '5%', size: 55, speed: 1.3, delay: 0.2, intensity: 0.85 },
-  { position: 'bottom', left: '10%', size: 85, speed: 0.7, delay: 0.3, intensity: 1 },
-  { position: 'bottom', left: '15%', size: 60, speed: 1.1, delay: 0.15, intensity: 0.88 },
-  { position: 'bottom', left: '20%', size: 90, speed: 0.55, delay: 0.25, intensity: 0.98 },
-  { position: 'bottom', left: '25%', size: 50, speed: 1.4, delay: 0.05, intensity: 0.82 },
-  { position: 'bottom', left: '30%', size: 80, speed: 0.8, delay: 0.35, intensity: 0.92 },
-  { position: 'bottom', left: '35%', size: 65, speed: 1.0, delay: 0.12, intensity: 0.9 },
-  { position: 'bottom', left: '40%', size: 95, speed: 0.6, delay: 0.22, intensity: 1 },
-  { position: 'bottom', left: '45%', size: 70, speed: 0.85, delay: 0.08, intensity: 0.94 },
-  { position: 'bottom', left: '50%', size: 100, speed: 0.5, delay: 0.18, intensity: 1 },
-  { position: 'bottom', left: '55%', size: 60, speed: 1.2, delay: 0.28, intensity: 0.86 },
-  { position: 'bottom', left: '60%', size: 85, speed: 0.75, delay: 0.1, intensity: 0.96 },
-  { position: 'bottom', left: '65%', size: 55, speed: 1.35, delay: 0.2, intensity: 0.84 },
-  { position: 'bottom', left: '70%', size: 90, speed: 0.65, delay: 0.3, intensity: 0.99 },
-  { position: 'bottom', left: '75%', size: 70, speed: 0.95, delay: 0.15, intensity: 0.91 },
-  { position: 'bottom', left: '80%', size: 80, speed: 0.7, delay: 0.25, intensity: 0.97 },
-  { position: 'bottom', left: '85%', size: 60, speed: 1.15, delay: 0.05, intensity: 0.87 },
-  { position: 'bottom', left: '90%', size: 95, speed: 0.55, delay: 0.35, intensity: 1 },
-  { position: 'bottom', left: '95%', size: 75, speed: 0.8, delay: 0.12, intensity: 0.93 },
-  // Left edge flames
-  { position: 'left', top: '0%', size: 70, speed: 0.85, delay: 0.1, intensity: 0.92 },
-  { position: 'left', top: '5%', size: 55, speed: 1.2, delay: 0.2, intensity: 0.85 },
-  { position: 'left', top: '10%', size: 85, speed: 0.6, delay: 0.3, intensity: 0.98 },
-  { position: 'left', top: '15%', size: 60, speed: 1.1, delay: 0.15, intensity: 0.88 },
-  { position: 'left', top: '20%', size: 90, speed: 0.5, delay: 0.25, intensity: 1 },
-  { position: 'left', top: '25%', size: 50, speed: 1.4, delay: 0.05, intensity: 0.82 },
-  { position: 'left', top: '30%', size: 80, speed: 0.75, delay: 0.35, intensity: 0.94 },
-  { position: 'left', top: '35%', size: 65, speed: 0.95, delay: 0.12, intensity: 0.9 },
-  { position: 'left', top: '40%', size: 95, speed: 0.55, delay: 0.22, intensity: 1 },
-  { position: 'left', top: '45%', size: 70, speed: 0.8, delay: 0.08, intensity: 0.93 },
-  { position: 'left', top: '50%', size: 100, speed: 0.45, delay: 0.18, intensity: 1 },
-  { position: 'left', top: '55%', size: 60, speed: 1.15, delay: 0.28, intensity: 0.86 },
-  { position: 'left', top: '60%', size: 85, speed: 0.7, delay: 0.1, intensity: 0.96 },
-  { position: 'left', top: '65%', size: 55, speed: 1.3, delay: 0.2, intensity: 0.84 },
-  { position: 'left', top: '70%', size: 90, speed: 0.6, delay: 0.3, intensity: 0.99 },
-  { position: 'left', top: '75%', size: 70, speed: 0.9, delay: 0.15, intensity: 0.91 },
-  { position: 'left', top: '80%', size: 80, speed: 0.65, delay: 0.25, intensity: 0.97 },
-  { position: 'left', top: '85%', size: 60, speed: 1.1, delay: 0.05, intensity: 0.87 },
-  { position: 'left', top: '90%', size: 95, speed: 0.5, delay: 0.35, intensity: 1 },
-  { position: 'left', top: '95%', size: 75, speed: 0.75, delay: 0.12, intensity: 0.93 },
-  // Right edge flames
-  { position: 'right', top: '0%', size: 75, speed: 0.8, delay: 0.15, intensity: 0.94 },
-  { position: 'right', top: '5%', size: 55, speed: 1.25, delay: 0.25, intensity: 0.86 },
-  { position: 'right', top: '10%', size: 90, speed: 0.55, delay: 0.35, intensity: 0.99 },
-  { position: 'right', top: '15%', size: 60, speed: 1.05, delay: 0.1, intensity: 0.88 },
-  { position: 'right', top: '20%', size: 85, speed: 0.65, delay: 0.2, intensity: 0.97 },
-  { position: 'right', top: '25%', size: 50, speed: 1.35, delay: 0.3, intensity: 0.83 },
-  { position: 'right', top: '30%', size: 80, speed: 0.7, delay: 0.05, intensity: 0.95 },
-  { position: 'right', top: '35%', size: 65, speed: 0.9, delay: 0.18, intensity: 0.91 },
-  { position: 'right', top: '40%', size: 95, speed: 0.5, delay: 0.28, intensity: 1 },
-  { position: 'right', top: '45%', size: 70, speed: 0.85, delay: 0.12, intensity: 0.93 },
-  { position: 'right', top: '50%', size: 100, speed: 0.4, delay: 0.22, intensity: 1 },
-  { position: 'right', top: '55%', size: 60, speed: 1.2, delay: 0.08, intensity: 0.87 },
-  { position: 'right', top: '60%', size: 85, speed: 0.6, delay: 0.32, intensity: 0.98 },
-  { position: 'right', top: '65%', size: 55, speed: 1.3, delay: 0.15, intensity: 0.85 },
-  { position: 'right', top: '70%', size: 90, speed: 0.55, delay: 0.25, intensity: 1 },
-  { position: 'right', top: '75%', size: 70, speed: 0.95, delay: 0.05, intensity: 0.92 },
-  { position: 'right', top: '80%', size: 80, speed: 0.7, delay: 0.18, intensity: 0.96 },
-  { position: 'right', top: '85%', size: 60, speed: 1.15, delay: 0.28, intensity: 0.88 },
-  { position: 'right', top: '90%', size: 95, speed: 0.45, delay: 0.1, intensity: 1 },
-  { position: 'right', top: '95%', size: 75, speed: 0.8, delay: 0.3, intensity: 0.94 },
+// Matrix characters for edges - tiny falling code effect
+const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+const getRandomChar = () => matrixChars[Math.floor(Math.random() * matrixChars.length)];
+
+// Matrix rain elements for all 4 edges
+const matrixRainElements: Array<{
+  position: 'top' | 'bottom' | 'left' | 'right';
+  left?: string;
+  top?: string;
+  speed: number;
+  delay: number;
+  char: string;
+}> = [
+  // Top edge - falling down
+  ...Array.from({ length: 40 }, (_, i) => ({
+    position: 'top' as const,
+    left: `${(i * 2.5)}%`,
+    speed: 0.8 + Math.random() * 0.6,
+    delay: Math.random() * 2,
+    char: getRandomChar(),
+  })),
+  // Bottom edge - falling up
+  ...Array.from({ length: 40 }, (_, i) => ({
+    position: 'bottom' as const,
+    left: `${(i * 2.5)}%`,
+    speed: 0.8 + Math.random() * 0.6,
+    delay: Math.random() * 2,
+    char: getRandomChar(),
+  })),
+  // Left edge - falling right
+  ...Array.from({ length: 30 }, (_, i) => ({
+    position: 'left' as const,
+    top: `${(i * 3.3)}%`,
+    speed: 0.8 + Math.random() * 0.6,
+    delay: Math.random() * 2,
+    char: getRandomChar(),
+  })),
+  // Right edge - falling left
+  ...Array.from({ length: 30 }, (_, i) => ({
+    position: 'right' as const,
+    top: `${(i * 3.3)}%`,
+    speed: 0.8 + Math.random() * 0.6,
+    delay: Math.random() * 2,
+    char: getRandomChar(),
+  })),
 ];
 
 // Matrix ONIMIX floating elements
@@ -176,41 +135,30 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-      {/* 🔥 POWERFUL FLAME BORDER EFFECT - 5D ROTATING FLAMES 🔥 */}
-      {flameElements.map((flame, i) => (
+      {/* 💚 MATRIX RAIN BORDER EFFECT - TINY FALLING CODE 💚 */}
+      {matrixRainElements.map((el, i) => (
         <div
-          key={`flame-${i}`}
-          className="fixed pointer-events-none z-50"
+          key={`matrix-${i}`}
+          className="fixed pointer-events-none z-50 matrix-rain-container"
           style={{
-            [flame.position === 'top' ? 'top' : flame.position === 'bottom' ? 'bottom' : flame.position === 'left' ? 'left' : 'right']: '-10px',
-            ...(flame.position === 'top' || flame.position === 'bottom' ? { left: flame.left } : { top: flame.top }),
-            width: flame.position === 'top' || flame.position === 'bottom' ? '5%' : `${flame.size}px`,
-            height: flame.position === 'top' || flame.position === 'bottom' ? `${flame.size}px` : '5%',
+            [el.position]: '0',
+            ...(el.position === 'top' || el.position === 'bottom' ? { left: el.left } : { top: el.top }),
+            animation: el.position === 'top' ? `matrixFallDown ${el.speed}s linear infinite` :
+                       el.position === 'bottom' ? `matrixFallUp ${el.speed}s linear infinite` :
+                       el.position === 'left' ? `matrixFallRight ${el.speed}s linear infinite` :
+                       `matrixFallLeft ${el.speed}s linear infinite`,
+            animationDelay: `${el.delay}s`,
           }}
         >
-          {/* Main flame */}
-          <div
-            className="flame-container"
-            style={{
-              animation: `flameRotate ${flame.speed}s linear infinite, flamePulse ${flame.speed * 0.7}s ease-in-out infinite`,
-              animationDelay: `${flame.delay}s, ${flame.delay * 0.5}s`,
-              transform: `scale(${flame.intensity})`,
-            }}
-          >
-            <div className="flame flame-outer" style={{ animationDuration: `${flame.speed * 0.8}s` }} />
-            <div className="flame flame-middle" style={{ animationDuration: `${flame.speed * 0.6}s` }} />
-            <div className="flame flame-inner" style={{ animationDuration: `${flame.speed * 0.4}s` }} />
-            <div className="flame flame-core" style={{ animationDuration: `${flame.speed * 0.3}s` }} />
-          </div>
-          {/* Glow effect */}
-          <div
-            className="flame-glow"
-            style={{
-              animation: `glowPulse ${flame.speed * 1.5}s ease-in-out infinite`,
-              animationDelay: `${flame.delay}s`,
-              opacity: flame.intensity * 0.8,
-            }}
-          />
+          <span className="matrix-char" style={{
+            color: '#00ff41',
+            textShadow: '0 0 8px #00ff41, 0 0 15px #00ff41, 0 0 25px #00ff41',
+            fontSize: '10px',
+            fontFamily: "'Courier New', monospace",
+            fontWeight: 'bold',
+          }}>
+            {el.char}
+          </span>
         </div>
       ))}
 
@@ -328,99 +276,48 @@ export default function Home() {
       </main>
 
       <style jsx global>{`
-        /* 🔥 POWERFUL FLAME ANIMATIONS - 5D EFFECT 🔥 */
-        @keyframes flameRotate {
-          0% { transform: rotate(0deg) scale(1); }
-          25% { transform: rotate(90deg) scale(1.1); }
-          50% { transform: rotate(180deg) scale(1); }
-          75% { transform: rotate(270deg) scale(1.15); }
-          100% { transform: rotate(360deg) scale(1); }
+        /* 💚 MATRIX RAIN ANIMATIONS - TINY FALLING CODE 💚 */
+        @keyframes matrixFallDown {
+          0% { transform: translateY(-20px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
         }
         
-        @keyframes flamePulse {
-          0%, 100% { filter: brightness(1) saturate(1); }
-          50% { filter: brightness(1.3) saturate(1.2); }
+        @keyframes matrixFallUp {
+          0% { transform: translateY(20px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-100vh); opacity: 0; }
         }
         
-        @keyframes glowPulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.3); }
+        @keyframes matrixFallRight {
+          0% { transform: translateX(-20px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateX(100vw); opacity: 0; }
         }
         
-        @keyframes flicker {
-          0%, 100% { opacity: 1; transform: scaleY(1) scaleX(1); }
-          25% { opacity: 0.9; transform: scaleY(1.1) scaleX(0.95); }
-          50% { opacity: 1; transform: scaleY(0.95) scaleX(1.05); }
-          75% { opacity: 0.85; transform: scaleY(1.05) scaleX(0.98); }
+        @keyframes matrixFallLeft {
+          0% { transform: translateX(20px); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateX(-100vw); opacity: 0; }
         }
         
-        .flame-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
+        .matrix-rain-container {
           display: flex;
           align-items: center;
           justify-content: center;
         }
         
-        .flame {
-          position: absolute;
-          border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-          animation: flicker 0.3s ease-in-out infinite;
+        .matrix-char {
+          animation: matrixFlicker 0.15s ease-in-out infinite;
         }
         
-        .flame-outer {
-          width: 100%;
-          height: 100%;
-          background: radial-gradient(ellipse at bottom, 
-            rgba(255, 100, 0, 0.9) 0%, 
-            rgba(255, 50, 0, 0.7) 30%, 
-            rgba(255, 0, 0, 0.5) 60%, 
-            transparent 100%);
-          filter: blur(2px);
-        }
-        
-        .flame-middle {
-          width: 75%;
-          height: 75%;
-          background: radial-gradient(ellipse at bottom, 
-            rgba(255, 150, 0, 1) 0%, 
-            rgba(255, 100, 0, 0.8) 40%, 
-            rgba(255, 50, 0, 0.4) 70%, 
-            transparent 100%);
-          filter: blur(1px);
-        }
-        
-        .flame-inner {
-          width: 50%;
-          height: 50%;
-          background: radial-gradient(ellipse at bottom, 
-            rgba(255, 200, 50, 1) 0%, 
-            rgba(255, 150, 0, 0.9) 50%, 
-            rgba(255, 100, 0, 0.3) 80%, 
-            transparent 100%);
-        }
-        
-        .flame-core {
-          width: 25%;
-          height: 25%;
-          background: radial-gradient(ellipse at bottom, 
-            rgba(255, 255, 200, 1) 0%, 
-            rgba(255, 220, 100, 0.9) 50%, 
-            rgba(255, 180, 50, 0.5) 80%, 
-            transparent 100%);
-          filter: blur(0.5px);
-        }
-        
-        .flame-glow {
-          position: absolute;
-          width: 200%;
-          height: 200%;
-          background: radial-gradient(ellipse at center, 
-            rgba(255, 100, 0, 0.4) 0%, 
-            rgba(255, 50, 0, 0.2) 30%, 
-            transparent 70%);
-          pointer-events: none;
+        @keyframes matrixFlicker {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
         }
 
         @keyframes marquee {
