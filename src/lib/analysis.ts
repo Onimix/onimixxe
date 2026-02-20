@@ -239,7 +239,7 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
   return { valid: true, data: parsedOdds };
 }
 
-// Parse tab-separated results input (e.g., "08:24\tLEV 0-2 HSV")
+// Parse tab or comma-separated results input (e.g., "08:24\tLEV 0-2 HSV" or "08:24,LEV 0-2 HSV")
 export function parseResultsInput(input: string): { valid: boolean; data?: ParsedResult[]; error?: string } {
   const lines = input.trim().split('\n');
   const parsedResults: ParsedResult[] = [];
@@ -248,10 +248,10 @@ export function parseResultsInput(input: string): { valid: boolean; data?: Parse
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Split by tab to get time and result
-    const parts = line.split('\t');
+    // Split by tab or comma to get time and result
+    const parts = line.split(/[\t,]/);
     if (parts.length < 2) {
-      return { valid: false, error: `Line ${i + 1}: Missing tab separator between time and result` };
+      return { valid: false, error: `Line ${i + 1}: Missing separator between time and result (use tab or comma)` };
     }
 
     const blockTime = parts[0].trim();
