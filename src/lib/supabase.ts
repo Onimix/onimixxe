@@ -4,13 +4,25 @@ import type { Result, Odds } from './types';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
+// Validate URL format before creating client
+function isValidUrl(url: string | undefined): url is string {
+  if (!url) return false;
+  try {
+    new URL(url);
+    return url.startsWith('http://') || url.startsWith('https://');
+  } catch {
+    return false;
+  }
 }
 
-export const supabase = supabaseUrl && supabaseAnonKey
+// Only create client if both variables are valid
+export const supabase = isValidUrl(supabaseUrl) && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+if (!supabase) {
+  console.warn('Missing or invalid Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
 
 // Results operations
 export async function insertResults(results: Omit<Result, 'id' | 'created_at'>[]): Promise<{ success: boolean; error?: string; count: number }> {
