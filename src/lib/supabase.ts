@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Result, Odds } from './types';
+import type { Result, Odds, PredictionRecord, PerformanceMetrics, ProbabilityBands } from './types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // Support both anon key and publishable key variable names
@@ -277,5 +277,368 @@ export async function getHistoricalStats(): Promise<{
   } catch (error) {
     console.error('Error calculating historical stats:', error);
     return { totalMatches: 0, avgGoals: 0, over15Rate: 0, over25Rate: 0 };
+  }
+}
+
+// =====================================================
+// PREDICTIONS OPERATIONS
+// =====================================================
+
+export async function insertPrediction(prediction: {
+  match_date?: string;
+  match_time?: string;
+  home_team: string;
+  away_team: string;
+  home_odd?: number;
+  draw_odd?: number;
+  away_odd?: number;
+  goal_line?: number;
+  over_odd?: number;
+  under_odd?: number;
+  ai_prediction: string;
+  ai_probability_over15?: number;
+  ai_probability_over25?: number;
+  ai_confidence_score?: number;
+  ai_status?: string;
+  block_time_stats?: Record<string, unknown>;
+  team_stats_home?: Record<string, unknown>;
+  team_stats_away?: Record<string, unknown>;
+  calibrated_probability?: number;
+  calibration_applied?: boolean;
+}): Promise<{ success: boolean; error?: string; data?: PredictionRecord }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('predictions')
+      .insert(prediction)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting prediction:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting prediction:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function getPredictions(limit = 100): Promise<PredictionRecord[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('predictions')
+      .select('*')
+      .order('prediction_date', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching predictions:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching predictions:', error);
+    return [];
+  }
+}
+
+export async function getPendingPredictions(): Promise<PredictionRecord[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('predictions')
+      .select('*')
+      .is('is_correct', null)
+      .order('prediction_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching pending predictions:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching pending predictions:', error);
+    return [];
+  }
+}
+
+export async function getPredictionByMatch(
+  homeTeam: string, 
+  awayTeam: string, 
+  matchDate?: string
+): Promise<PredictionRecord | null> {
+  if (!supabase) {
+    return null;
+  }
+
+  try {
+    let query = supabase
+      .from('predictions')
+      .select('*')
+      .eq('home_team', homeTeam)
+      .eq('away_team', awayTeam);
+
+    if (matchDate) {
+      query = query.eq('match_date', matchDate);
+    }
+
+    const { data, error } = await query
+      .order('prediction_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code !== 'PGRST116') { // Not found error
+        console.error('Error fetching prediction by match:', error);
+      }
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching prediction by match:', error);
+    return null;
+  }
+}
+
+// =====================================================
+// PERFORMANCE METRICS
+// =====================================================
+
+export async function getPerformanceMetrics(): Promise<PerformanceMetrics> {
+  const defaultMetrics: PerformanceMetrics = {
+    total_predictions: 0,
+    total_correct: 0,
+    total_accuracy: 0,
+    total_profit_loss: 0,
+    rolling_50_accuracy: 0,
+  };
+
+  if (!supabase) {
+    return defaultMetrics;
+  }
+
+  try {
+    // Get total predictions with results
+    const { data: allPredictions, error: predError } = await supabase
+      .from('predictions')
+      .select('is_correct, profit_loss, ai_probability_over15, prediction_date')
+      .not('is_correct', 'is', null);
+
+    if (predError) {
+      console.error('Error fetching predictions for metrics:', predError);
+      return defaultMetrics;
+    }
+
+    if (!allPredictions || allPredictions.length === 0) {
+      return defaultMetrics;
+    }
+
+    const totalPredictions = allPredictions.length;
+    const totalCorrect = allPredictions.filter(p => p.is_correct === true).length;
+    const totalAccuracy = (totalCorrect / totalPredictions) * 100;
+    const totalProfitLoss = allPredictions.reduce((sum, p) => sum + (p.profit_loss || 0), 0);
+
+    // Rolling 50 accuracy
+    const sortedPredictions = [...allPredictions].sort((a, b) => 
+      new Date(b.prediction_date).getTime() - new Date(a.prediction_date).getTime()
+    );
+    const last50 = sortedPredictions.slice(0, 50);
+    const rolling50Correct = last50.filter(p => p.is_correct === true).length;
+    const rolling50Accuracy = last50.length > 0 ? (rolling50Correct / last50.length) * 100 : 0;
+
+    // Current month accuracy
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const currentMonthPredictions = allPredictions.filter(p => {
+      const predDate = new Date(p.prediction_date);
+      return predDate.getMonth() === currentMonth && predDate.getFullYear() === currentYear;
+    });
+    const currentMonthCorrect = currentMonthPredictions.filter(p => p.is_correct === true).length;
+    const currentMonthAccuracy = currentMonthPredictions.length > 0 
+      ? (currentMonthCorrect / currentMonthPredictions.length) * 100 
+      : 0;
+
+    // Probability bands
+    const bands: ProbabilityBands = {
+      '50-59': { total: 0, correct: 0, accuracy: 0 },
+      '60-69': { total: 0, correct: 0, accuracy: 0 },
+      '70-79': { total: 0, correct: 0, accuracy: 0 },
+      '80-89': { total: 0, correct: 0, accuracy: 0 },
+      '90-100': { total: 0, correct: 0, accuracy: 0 },
+    };
+
+    allPredictions.forEach(p => {
+      const prob = p.ai_probability_over15 || 0;
+      let band: keyof ProbabilityBands | null = null;
+      
+      if (prob >= 50 && prob < 60) band = '50-59';
+      else if (prob >= 60 && prob < 70) band = '60-69';
+      else if (prob >= 70 && prob < 80) band = '70-79';
+      else if (prob >= 80 && prob < 90) band = '80-89';
+      else if (prob >= 90) band = '90-100';
+
+      if (band) {
+        bands[band].total++;
+        if (p.is_correct === true) {
+          bands[band].correct++;
+        }
+      }
+    });
+
+    // Calculate accuracy for each band
+    Object.keys(bands).forEach(key => {
+      const band = key as keyof ProbabilityBands;
+      if (bands[band].total > 0) {
+        bands[band].accuracy = (bands[band].correct / bands[band].total) * 100;
+      }
+    });
+
+    // Calculate calibration factor
+    const avgPredicted = allPredictions.reduce((sum, p) => sum + (p.ai_probability_over15 || 0), 0) / totalPredictions;
+    const calibrationFactor = avgPredicted > 0 ? totalAccuracy / avgPredicted : 1.0;
+
+    return {
+      total_predictions: totalPredictions,
+      total_correct: totalCorrect,
+      total_accuracy: Math.round(totalAccuracy * 100) / 100,
+      total_profit_loss: Math.round(totalProfitLoss * 100) / 100,
+      rolling_50_accuracy: Math.round(rolling50Accuracy * 100) / 100,
+      current_month_predictions: currentMonthPredictions.length,
+      current_month_correct: currentMonthCorrect,
+      current_month_accuracy: Math.round(currentMonthAccuracy * 100) / 100,
+      probability_bands: bands,
+      calibration_factor: Math.round(calibrationFactor * 10000) / 10000,
+    };
+  } catch (error) {
+    console.error('Error calculating performance metrics:', error);
+    return defaultMetrics;
+  }
+}
+
+export async function getCalibrationFactor(): Promise<number> {
+  if (!supabase) {
+    return 1.0;
+  }
+
+  try {
+    const metrics = await getPerformanceMetrics();
+    return metrics.calibration_factor || 1.0;
+  } catch (error) {
+    console.error('Error getting calibration factor:', error);
+    return 1.0;
+  }
+}
+
+// =====================================================
+// RESULT LINKING (Manual trigger for backfilling)
+// =====================================================
+
+export async function linkResultsToPredictions(): Promise<{ 
+  success: boolean; 
+  updated: number; 
+  error?: string 
+}> {
+  if (!supabase) {
+    return { success: false, updated: 0, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    // Get all predictions without results
+    const { data: pendingPredictions, error: predError } = await supabase
+      .from('predictions')
+      .select('*')
+      .is('is_correct', null);
+
+    if (predError) {
+      return { success: false, updated: 0, error: predError.message };
+    }
+
+    if (!pendingPredictions || pendingPredictions.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    let updatedCount = 0;
+
+    for (const pred of pendingPredictions) {
+      // Find matching result
+      const query = supabase
+        .from('results')
+        .select('*')
+        .eq('home_team', pred.home_team)
+        .eq('away_team', pred.away_team);
+
+      const { data: results, error: resultError } = pred.match_date
+        ? await query.eq('match_date', pred.match_date)
+        : await query;
+
+      if (resultError || !results || results.length === 0) {
+        continue;
+      }
+
+      const result = results[0];
+      
+      // Determine if prediction was correct
+      let isCorrect: boolean | null = null;
+      if (pred.ai_prediction === 'OVER 1.5') {
+        isCorrect = result.over_15;
+      } else if (pred.ai_prediction === 'OVER 2.5') {
+        isCorrect = result.over_25;
+      } else if (pred.ai_prediction === 'UNDER 1.5') {
+        isCorrect = !result.over_15;
+      } else if (pred.ai_prediction === 'UNDER 2.5') {
+        isCorrect = !result.over_25;
+      }
+
+      // Calculate profit/loss
+      let profitLoss = 0;
+      if (isCorrect === true && pred.over_odd) {
+        profitLoss = pred.over_odd - 1;
+      } else if (isCorrect === false) {
+        profitLoss = -1;
+      }
+
+      // Update prediction
+      const { error: updateError } = await supabase
+        .from('predictions')
+        .update({
+          final_result_over15: result.over_15,
+          final_result_over25: result.over_25,
+          final_home_goals: result.home_goals,
+          final_away_goals: result.away_goals,
+          final_total_goals: result.total_goals,
+          is_correct: isCorrect,
+          profit_loss: profitLoss,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pred.id);
+
+      if (!updateError) {
+        updatedCount++;
+      }
+    }
+
+    return { success: true, updated: updatedCount };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error linking results to predictions:', errorMessage);
+    return { success: false, updated: 0, error: errorMessage };
   }
 }

@@ -169,7 +169,9 @@ export function validateSportyJson(data: unknown): { valid: boolean; error?: str
   return { valid: true };
 }
 
-// Parse odds from tab-separated string
+// Parse odds from tab-separated string (supports both old and new format)
+// Old format: Time, Event, 1, X, 2, Goals, Over, Under
+// New format: Date, Time, Event, 1, X, 2, Goals, Over, Under
 export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOdds[]; error?: string } {
   const lines = input.trim().split('\n');
   
@@ -177,6 +179,10 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
     return { valid: false, error: 'No data rows found. Please include header and at least one data row.' };
   }
 
+  // Detect format by checking header
+  const headerLine = lines[0].toLowerCase();
+  const hasDateColumn = headerLine.includes('date');
+  
   // Skip header row
   const dataLines = lines.slice(1);
   const parsedOdds: ParsedOdds[] = [];
@@ -187,15 +193,48 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
 
     const parts = line.split('\t');
     
-    if (parts.length < 8) {
-      return { valid: false, error: `Line ${i + 2}: Expected at least 8 columns, got ${parts.length}. Format: Time, Event, 1, X, 2, Goals, Over, Under` };
+    // Determine column indices based on format
+    let dateCol: string | undefined;
+    let timeCol: string;
+    let eventCol: string;
+    let homeOddIdx: number;
+    let drawOddIdx: number;
+    let awayOddIdx: number;
+    let goalLineIdx: number;
+    let overOddIdx: number;
+    let underOddIdx: number;
+    
+    if (hasDateColumn) {
+      // New format: Date, Time, Event, 1, X, 2, Goals, Over, Under
+      if (parts.length < 9) {
+        return { valid: false, error: `Line ${i + 2}: Expected 9 columns with date, got ${parts.length}. Format: Date, Time, Event, 1, X, 2, Goals, Over, Under` };
+      }
+      dateCol = parts[0].trim();
+      timeCol = parts[1].trim();
+      eventCol = parts[2].trim();
+      homeOddIdx = 3;
+      drawOddIdx = 4;
+      awayOddIdx = 5;
+      goalLineIdx = 6;
+      overOddIdx = 7;
+      underOddIdx = 8;
+    } else {
+      // Old format: Time, Event, 1, X, 2, Goals, Over, Under
+      if (parts.length < 8) {
+        return { valid: false, error: `Line ${i + 2}: Expected at least 8 columns, got ${parts.length}. Format: Time, Event, 1, X, 2, Goals, Over, Under` };
+      }
+      timeCol = parts[0].trim();
+      eventCol = parts[1].trim();
+      homeOddIdx = 2;
+      drawOddIdx = 3;
+      awayOddIdx = 4;
+      goalLineIdx = 5;
+      overOddIdx = 6;
+      underOddIdx = 7;
     }
-
-    const blockTime = parts[0].trim();
-    const event = parts[1].trim();
     
     // Parse event "FCA - HDH" to get teams
-    const teamParts = event.split(' - ');
+    const teamParts = eventCol.split(' - ');
     if (teamParts.length !== 2) {
       return { valid: false, error: `Line ${i + 2}: Invalid event format. Expected "HomeTeam - AwayTeam"` };
     }
@@ -203,24 +242,36 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
     const homeTeam = teamParts[0].trim();
     const awayTeam = teamParts[1].trim();
 
-    const homeOdd = parseFloat(parts[2]);
-    const drawOdd = parseFloat(parts[3]);
-    const awayOdd = parseFloat(parts[4]);
-    const goalLine = parseFloat(parts[5]);
-    const overOdd = parseFloat(parts[6]);
-    const underOdd = parseFloat(parts[7]);
+    const homeOdd = parseFloat(parts[homeOddIdx]);
+    const drawOdd = parseFloat(parts[drawOddIdx]);
+    const awayOdd = parseFloat(parts[awayOddIdx]);
+    const goalLine = parseFloat(parts[goalLineIdx]);
+    const overOdd = parseFloat(parts[overOddIdx]);
+    const underOdd = parseFloat(parts[underOddIdx]);
 
     if (isNaN(homeOdd) || isNaN(drawOdd) || isNaN(awayOdd) ||
         isNaN(goalLine) || isNaN(overOdd) || isNaN(underOdd)) {
       return { valid: false, error: `Line ${i + 2}: Invalid numeric values` };
     }
 
-    if (!blockTime || !homeTeam || !awayTeam) {
+    if (!timeCol || !homeTeam || !awayTeam) {
       return { valid: false, error: `Line ${i + 2}: Missing required fields` };
     }
 
+    // Parse date to ISO format (DD/MM/YYYY -> YYYY-MM-DD)
+    let matchDate: string | undefined;
+    if (dateCol) {
+      const dateParts = dateCol.split('/');
+      if (dateParts.length === 3) {
+        const day = dateParts[0].padStart(2, '0');
+        const month = dateParts[1].padStart(2, '0');
+        const year = dateParts[2];
+        matchDate = `${year}-${month}-${day}`;
+      }
+    }
+
     parsedOdds.push({
-      block_time: blockTime,
+      block_time: timeCol,
       home_team: homeTeam,
       away_team: awayTeam,
       home_odd: homeOdd,
@@ -229,6 +280,7 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
       goal_line: goalLine,
       over_odd: overOdd,
       under_odd: underOdd,
+      match_date: matchDate,
     });
   }
 
@@ -239,7 +291,9 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
   return { valid: true, data: parsedOdds };
 }
 
-// Parse tab or comma-separated results input (e.g., "08:24\tLEV 0-2 HSV" or "08:24,LEV 0-2 HSV")
+// Parse tab or comma-separated results input
+// Old format: "08:24\tLEV 0-2 HSV" or "08:24,LEV 0-2 HSV"
+// New format: "26/01/2026\t08:24\tLEV 0-2 HSV" (with date)
 export function parseResultsInput(input: string): { valid: boolean; data?: ParsedResult[]; error?: string } {
   const lines = input.trim().split('\n');
   const parsedResults: ParsedResult[] = [];
@@ -248,18 +302,37 @@ export function parseResultsInput(input: string): { valid: boolean; data?: Parse
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Split by tab or comma to get time and result
+    // Split by tab or comma
     const parts = line.split(/[\t,]/);
-    if (parts.length < 2) {
-      return { valid: false, error: `Line ${i + 1}: Missing separator between time and result (use tab or comma)` };
+    
+    // Detect format: if first part looks like a date (DD/MM/YYYY), use new format
+    let dateCol: string | undefined;
+    let timeCol: string;
+    let resultCol: string;
+    
+    const firstPart = parts[0].trim();
+    const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+    
+    if (datePattern.test(firstPart)) {
+      // New format: Date, Time, Result
+      if (parts.length < 3) {
+        return { valid: false, error: `Line ${i + 1}: Expected Date, Time, Result format` };
+      }
+      dateCol = firstPart;
+      timeCol = parts[1].trim();
+      resultCol = parts[2].trim();
+    } else {
+      // Old format: Time, Result
+      if (parts.length < 2) {
+        return { valid: false, error: `Line ${i + 1}: Missing separator between time and result (use tab or comma)` };
+      }
+      timeCol = firstPart;
+      resultCol = parts[1].trim();
     }
-
-    const blockTime = parts[0].trim();
-    const result = parts[1].trim();
 
     // Parse result "LEV 0-2 HSV" to get teams and score
     // Format: TEAM_A GOAL-GOAL TEAM_B
-    const resultParts = result.split(/\s+/);
+    const resultParts = resultCol.split(/\s+/);
     if (resultParts.length !== 3) {
       return { valid: false, error: `Line ${i + 1}: Invalid result format. Expected "TEAM GOAL-GOAL TEAM"` };
     }
@@ -281,14 +354,26 @@ export function parseResultsInput(input: string): { valid: boolean; data?: Parse
       return { valid: false, error: `Line ${i + 1}: Invalid score values` };
     }
 
-    if (!blockTime || !homeTeam || !awayTeam) {
+    if (!timeCol || !homeTeam || !awayTeam) {
       return { valid: false, error: `Line ${i + 1}: Missing required fields` };
     }
 
     const totalGoals = homeGoals + awayGoals;
 
+    // Parse date to ISO format (DD/MM/YYYY -> YYYY-MM-DD)
+    let matchDate: string | undefined;
+    if (dateCol) {
+      const dateParts = dateCol.split('/');
+      if (dateParts.length === 3) {
+        const day = dateParts[0].padStart(2, '0');
+        const month = dateParts[1].padStart(2, '0');
+        const year = dateParts[2];
+        matchDate = `${year}-${month}-${day}`;
+      }
+    }
+
     parsedResults.push({
-      block_time: blockTime,
+      block_time: timeCol,
       home_team: homeTeam,
       away_team: awayTeam,
       home_goals: homeGoals,
@@ -296,6 +381,7 @@ export function parseResultsInput(input: string): { valid: boolean; data?: Parse
       total_goals: totalGoals,
       over_15: totalGoals >= 2,
       over_25: totalGoals >= 3,
+      match_date: matchDate,
     });
   }
 

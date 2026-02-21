@@ -59,6 +59,14 @@ export default function PredictionPanel({ predictions }: PredictionPanelProps) {
                 <span className="text-2xl font-bold text-gray-700">
                   {prediction.match.block_time}
                 </span>
+                {prediction.match.match_date && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <span className="text-sm text-gray-500">
+                      {prediction.match.match_date}
+                    </span>
+                  </>
+                )}
                 <span className="text-gray-400">|</span>
                 <span className="text-lg font-semibold text-gray-800">
                   {prediction.match.home_team} vs {prediction.match.away_team}
@@ -104,30 +112,43 @@ export default function PredictionPanel({ predictions }: PredictionPanelProps) {
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="text-xs text-gray-500 uppercase">Prediction</div>
                 <div className={`text-xl font-bold ${
-                  prediction.prediction === 'OVER 1.5' ? 'text-green-600' : 'text-red-600'
+                  prediction.prediction.includes('OVER') ? 'text-green-600' : 'text-red-600'
                 }`}>
                   {prediction.prediction}
                 </div>
               </div>
+              {/* Show calibrated probability if available */}
+              {prediction.calibrated_probability && (
+                <div className="bg-blue-50 rounded-lg p-3">
+                  <div className="text-xs text-blue-500 uppercase">Calibrated Prob.</div>
+                  <div className="text-xl font-bold text-blue-800">
+                    {prediction.calibrated_probability.toFixed(1)}%
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Confidence Bar */}
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Confidence</span>
-                  <span className="font-bold">{prediction.confidence}%</span>
+                  <span className="text-gray-600">
+                    Confidence {prediction.calibration_applied ? '(Calibrated)' : ''}
+                  </span>
+                  <span className="font-bold">
+                    {prediction.calibrated_probability || prediction.confidence}%
+                  </span>
                 </div>
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      prediction.confidence >= 75
+                      (prediction.calibrated_probability || prediction.confidence) >= 75
                         ? 'bg-green-500'
-                        : prediction.confidence >= 50
+                        : (prediction.calibrated_probability || prediction.confidence) >= 50
                         ? 'bg-yellow-500'
                         : 'bg-red-500'
                     }`}
-                    style={{ width: `${prediction.confidence}%` }}
+                    style={{ width: `${prediction.calibrated_probability || prediction.confidence}%` }}
                   />
                 </div>
               </div>

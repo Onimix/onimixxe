@@ -5,9 +5,9 @@ import JsonUploader from '@/components/JsonUploader';
 import OddsInput from '@/components/OddsInput';
 import HistoricalStatsPanel from '@/components/HistoricalStats';
 import PredictionPanel from '@/components/PredictionPanel';
-import { getAllResults, getAllOdds, getHistoricalStats } from '@/lib/supabase';
+import { getAllResults, getAllOdds, getHistoricalStats, getPerformanceMetrics, insertPrediction } from '@/lib/supabase';
 import { analyzeMatch } from '@/lib/analysis';
-import type { Result, Odds, HistoricalStats, Prediction } from '@/lib/types';
+import type { Result, Odds, HistoricalStats, Prediction, PerformanceMetrics } from '@/lib/types';
 
 // Matrix characters for edges - tiny falling code effect
 const matrixChars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
@@ -90,27 +90,67 @@ export default function Home() {
     over25Rate: 0,
   });
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [resultsData, oddsData, statsData] = await Promise.all([
+      const [resultsData, oddsData, statsData, metricsData] = await Promise.all([
         getAllResults(),
         getAllOdds(),
         getHistoricalStats(),
+        getPerformanceMetrics(),
       ]);
       
       setResults(resultsData);
       setOdds(oddsData);
       setHistoricalStats(statsData);
+      setPerformanceMetrics(metricsData);
 
-      // Generate predictions for each odd
+      // Generate predictions for each odd with calibration
       if (oddsData.length > 0 && resultsData.length > 0) {
-        const newPredictions = oddsData.map(odd => 
-          analyzeMatch(odd, resultsData)
-        );
+        const calibrationFactor = metricsData?.calibration_factor || 1.0;
+        
+        const newPredictions = oddsData.map(odd => {
+          const basePrediction = analyzeMatch(odd, resultsData);
+          
+          // Apply calibration to probability
+          const calibratedProbability = basePrediction.confidence * calibrationFactor;
+          
+          return {
+            ...basePrediction,
+            ai_probability_over15: basePrediction.confidence,
+            calibrated_probability: Math.min(99, calibratedProbability),
+            calibration_applied: calibrationFactor !== 1.0,
+          };
+        });
+        
         setPredictions(newPredictions);
+        
+        // Store predictions in database for tracking
+        for (const pred of newPredictions) {
+          if (pred.status !== 'RISKY') {
+            await insertPrediction({
+              match_date: pred.match.match_date,
+              match_time: pred.match.block_time,
+              home_team: pred.match.home_team,
+              away_team: pred.match.away_team,
+              home_odd: pred.match.home_odd,
+              draw_odd: pred.match.draw_odd,
+              away_odd: pred.match.away_odd,
+              goal_line: pred.match.goal_line,
+              over_odd: pred.match.over_odd,
+              under_odd: pred.match.under_odd,
+              ai_prediction: pred.prediction,
+              ai_probability_over15: pred.ai_probability_over15,
+              ai_confidence_score: pred.confidence,
+              ai_status: pred.status,
+              calibrated_probability: pred.calibrated_probability,
+              calibration_applied: pred.calibration_applied,
+            });
+          }
+        }
       } else {
         setPredictions([]);
       }
@@ -250,6 +290,69 @@ export default function Home() {
             )}
           </div>
         </section>
+
+        {/* Model Performance Panel */}
+        {performanceMetrics && performanceMetrics.total_predictions > 0 && (
+          <section className="mb-10">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                📈 Model Performance
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-white">
+                    {performanceMetrics.total_predictions}
+                  </div>
+                  <div className="text-slate-400 text-sm">Total Predictions</div>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-green-400">
+                    {performanceMetrics.total_accuracy.toFixed(1)}%
+                  </div>
+                  <div className="text-slate-400 text-sm">Accuracy</div>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-blue-400">
+                    {performanceMetrics.rolling_50_accuracy.toFixed(1)}%
+                  </div>
+                  <div className="text-slate-400 text-sm">Last 50 Accuracy</div>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                  <div className={`text-3xl font-bold ${performanceMetrics.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {performanceMetrics.total_profit_loss >= 0 ? '+' : ''}{performanceMetrics.total_profit_loss.toFixed(2)}
+                  </div>
+                  <div className="text-slate-400 text-sm">ROI (Units)</div>
+                </div>
+                <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-purple-400">
+                    {performanceMetrics.calibration_factor?.toFixed(3) || '1.000'}
+                  </div>
+                  <div className="text-slate-400 text-sm">Calibration Factor</div>
+                </div>
+              </div>
+              
+              {/* Probability Bands */}
+              {performanceMetrics.probability_bands && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-slate-300 mb-3">Accuracy by Probability Band</h3>
+                  <div className="grid grid-cols-5 gap-2">
+                    {Object.entries(performanceMetrics.probability_bands).map(([band, data]) => (
+                      <div key={band} className="bg-slate-700/30 rounded-lg p-3 text-center">
+                        <div className="text-xs text-slate-500 mb-1">{band}%</div>
+                        <div className="text-lg font-bold text-white">
+                          {data.total > 0 ? `${data.accuracy.toFixed(0)}%` : '-'}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {data.total} pred
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Prediction Panel */}
         <section>

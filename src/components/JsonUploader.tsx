@@ -231,13 +231,13 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
       {/* Paste Input Section */}
       <div className="mt-6">
         <div className="text-sm font-medium text-gray-700 mb-2">Or paste results directly:</div>
-        <div className="text-xs text-gray-500 mb-2">Format: Time[tab]TeamA Goal-Goal TeamB (one per line)</div>
+        <div className="text-xs text-gray-500 mb-2">Format: Date[tab]Time[tab]TeamA Goal-Goal TeamB (one per line)</div>
         <textarea
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
-          placeholder="08:24	LEV 0-2 HSV
-08:24	MAI 4-0 SCF
-08:24	STP 0-0 SGE"
+          placeholder="26/01/2026	08:24	LEV 0-2 HSV
+26/01/2026	08:24	MAI 4-0 SCF
+26/01/2026	08:24	STP 0-0 SGE"
           className="w-full h-32 p-3 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
         <button
