@@ -21,6 +21,10 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 - [x] **Calibration logic for probability adjustment**
 - [x] **Model performance metrics display**
 - [x] **Date field support in odds/results input**
+- [x] **Collapsible Data Input Panel** (2026-02-21)
+- [x] **"Buy Me A Coffee" button in footer**
+- [x] **"Onimix is cooking" animated footer**
+- [x] **Results cleanup migration SQL**
 
 ## Current Structure
 
@@ -39,6 +43,7 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 | `src/components/PredictionPanel.tsx` | Predictions display | ✅ Ready |
 | `supabase/schema.sql` | DB schema | ✅ Ready |
 | `supabase/migration-performance-tracking.sql` | Performance migration | ✅ Ready |
+| `supabase/migration-cleanup-results.sql` | Results cleanup migration | ✅ Ready |
 | `.env.example` | Environment template | ✅ Ready |
 
 ## Current Focus
@@ -118,3 +123,6 @@ Date	Time	Match and Result
 | 2026-02-21 | Added calibration logic and model performance display |
 | 2026-02-21 | Added date field support to odds and results input |
 | 2026-02-21 | Fixed SQL syntax error in migration (CROSS JOIN LATERAL → subquery) |
+| 2026-02-21 | Added collapsible Data Input Panel with expand/collapse button |
+| 2026-02-21 | Added "Buy Me A Coffee" button and animated "Onimix is cooking" footer |
+| 2026-02-21 | Created results cleanup migration SQL to delete results without dates |
