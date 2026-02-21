@@ -417,7 +417,7 @@ export default function Home() {
 
           {/* Right Side - Buy Me A Coffee */}
           <a
-            href="https://wa.link/7jv61h"
+            href="https://wa.link/5olacp"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-yellow-500/25"
