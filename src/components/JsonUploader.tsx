@@ -49,7 +49,10 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
           if (parseResult.data && parseResult.data.length > 0) {
             const result = await insertResults(parseResult.data);
             if (result.success) {
-              totalProcessed += parseResult.data.length;
+              totalProcessed += result.count;
+              if (result.duplicates && result.duplicates > 0) {
+                console.log(`Skipped ${result.duplicates} duplicate results`);
+              }
             } else {
               console.error('Error inserting results:', result.error);
             }
@@ -100,7 +103,10 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
           if (parsedResults.length > 0) {
             const result = await insertResults(parsedResults);
             if (result.success) {
-              totalProcessed += parsedResults.length;
+              totalProcessed += result.count;
+              if (result.duplicates && result.duplicates > 0) {
+                console.log(`Skipped ${result.duplicates} duplicate results`);
+              }
             } else {
               console.error('Error inserting results:', result.error);
             }
@@ -117,10 +123,10 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
     setIsLoading(false);
 
     if (totalProcessed > 0) {
-      setMessage({ type: 'success', text: `Successfully processed ${totalProcessed} matches!` });
+      setMessage({ type: 'success', text: `Successfully inserted ${totalProcessed} new matches!` });
       onUploadComplete(totalProcessed);
     } else {
-      setMessage({ type: 'error', text: 'No valid matches found in the uploaded files' });
+      setMessage({ type: 'error', text: 'No new matches found. All results may already exist in the database.' });
     }
   };
 
@@ -143,8 +149,12 @@ export default function JsonUploader({ onUploadComplete }: JsonUploaderProps) {
     if (parseResult.data && parseResult.data.length > 0) {
       const result = await insertResults(parseResult.data);
       if (result.success) {
-        setMessage({ type: 'success', text: `Successfully processed ${parseResult.data.length} matches!` });
-        onUploadComplete(parseResult.data.length);
+        let message = `Successfully inserted ${result.count} matches!`;
+        if (result.duplicates && result.duplicates > 0) {
+          message += ` (${result.duplicates} duplicates skipped)`;
+        }
+        setMessage({ type: 'success', text: message });
+        onUploadComplete(result.count);
         setPasteText('');
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to insert results' });

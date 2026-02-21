@@ -27,7 +27,7 @@ if (!supabase) {
 }
 
 // Results operations
-export async function insertResults(results: Omit<Result, 'id' | 'created_at'>[]): Promise<{ success: boolean; error?: string; count: number }> {
+export async function insertResults(results: Omit<Result, 'id' | 'created_at'>[]): Promise<{ success: boolean; error?: string; count: number; duplicates?: number }> {
   if (!supabase) {
     return { success: false, error: 'Supabase client not initialized', count: 0 };
   }
@@ -47,7 +47,15 @@ export async function insertResults(results: Omit<Result, 'id' | 'created_at'>[]
       return { success: false, error: error.message, count: 0 };
     }
 
-    return { success: true, count: results.length };
+    // Return actual inserted count (data contains only inserted rows)
+    const insertedCount = data ? data.length : 0;
+    const duplicatesCount = results.length - insertedCount;
+
+    return { 
+      success: true, 
+      count: insertedCount, 
+      duplicates: duplicatesCount > 0 ? duplicatesCount : undefined 
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error inserting results:', errorMessage);
