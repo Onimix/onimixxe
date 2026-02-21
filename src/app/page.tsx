@@ -80,6 +80,9 @@ const matrixElements = [
   { text: 'ONIMIX', color: '#ff4040', top: '20%', left: '60%', delay: '4.2s', duration: '18s' },
 ];
 
+// Cooking animation elements
+const cookingEmojis = ['🍳', '🔥', '⚡', '✨', '🚀', '💎', '🎯', '🦅'];
+
 export default function Home() {
   const [results, setResults] = useState<Result[]>([]);
   const [odds, setOdds] = useState<Odds[]>([]);
@@ -92,6 +95,7 @@ export default function Home() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -235,7 +239,7 @@ export default function Home() {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8 pb-32">
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
@@ -246,31 +250,44 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Data Upload Panel */}
+        {/* Collapsible Data Upload Panel */}
         <section className="mb-10">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              📊 Data Upload Panel
+          <button
+            onClick={() => setIsInputExpanded(!isInputExpanded)}
+            className="w-full bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700 hover:border-slate-600 transition-all duration-300 flex items-center justify-between group"
+          >
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              📊 Data Input Panel
+              <span className="text-sm font-normal text-slate-400 group-hover:text-slate-300 transition-colors">
+                (Click to {isInputExpanded ? 'collapse' : 'expand'})
+              </span>
             </h2>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* JSON Upload */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-slate-300">
-                  📁 Upload Results (JSON)
-                </h3>
-                <JsonUploader onUploadComplete={handleResultsUploaded} />
-              </div>
+            <div className={`text-3xl transform transition-transform duration-300 ${isInputExpanded ? 'rotate-180' : ''}`}>
+              ⬇️
+            </div>
+          </button>
+          
+          {isInputExpanded && (
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-b-2xl p-6 border border-t-0 border-slate-700 mt-[-1px] animate-fadeIn">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* JSON Upload */}
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-slate-300">
+                    📁 Upload Results (JSON/TXT)
+                  </h3>
+                  <JsonUploader onUploadComplete={handleResultsUploaded} />
+                </div>
 
-              {/* Odds Input */}
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold text-slate-300">
-                  📋 Paste Odds (Tab-Separated)
-                </h3>
-                <OddsInput onOddsSubmitted={handleOddsSubmitted} />
+                {/* Odds Input */}
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-slate-300">
+                    📋 Paste Odds (Tab-Separated)
+                  </h3>
+                  <OddsInput onOddsSubmitted={handleOddsSubmitted} />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
 
         {/* Historical Intelligence Panel */}
@@ -371,12 +388,45 @@ export default function Home() {
             )}
           </div>
         </section>
-
-        {/* Footer */}
-        <footer className="mt-12 text-center text-slate-500 text-sm relative z-10">
-          <p>ONIMIX Eagle Eye Pick © 2026 - SAFE MODE Production Ready</p>
-        </footer>
       </main>
+
+      {/* Fixed Footer with Buy Me A Coffee and Cooking Animation */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 via-slate-900/95 to-transparent py-6 px-8 z-40">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          {/* Left Side - Onimix Cooking Animation */}
+          <div className="flex items-center gap-3">
+            <div className="cooking-container">
+              <span className="text-2xl cooking-emoji-1">🍳</span>
+              <span className="text-2xl cooking-emoji-2">🔥</span>
+              <span className="text-2xl cooking-emoji-3">⚡</span>
+            </div>
+            <div className="text-left">
+              <div className="text-white font-bold text-lg cooking-text">
+                Onimix is cooking...
+              </div>
+              <div className="text-yellow-400 text-sm font-semibold animate-pulse">
+                Wait for it ✨
+              </div>
+            </div>
+          </div>
+
+          {/* Center - Copyright */}
+          <div className="hidden md:block text-slate-500 text-sm">
+            ONIMIX Eagle Eye Pick © 2026 - SAFE MODE Production Ready
+          </div>
+
+          {/* Right Side - Buy Me A Coffee */}
+          <a
+            href="https://www.buymeacoffee.com/onimix"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-yellow-500/25"
+          >
+            <span className="text-xl">☕</span>
+            <span>Buy Me A Coffee</span>
+          </a>
+        </div>
+      </footer>
 
       <style jsx global>{`
         /* 💚 MATRIX RAIN ANIMATIONS - TINY FALLING CODE 💚 */
@@ -458,6 +508,58 @@ export default function Home() {
         .matrix-float {
           animation: matrixFloat 8s ease-in-out infinite;
           font-family: 'Courier New', monospace;
+        }
+
+        /* Fade In Animation */
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+
+        /* Cooking Animation */
+        .cooking-container {
+          display: flex;
+          gap: 4px;
+        }
+        
+        .cooking-emoji-1 {
+          animation: cookingBounce1 1s ease-in-out infinite;
+        }
+        .cooking-emoji-2 {
+          animation: cookingBounce2 1s ease-in-out infinite 0.2s;
+        }
+        .cooking-emoji-3 {
+          animation: cookingBounce3 1s ease-in-out infinite 0.4s;
+        }
+        
+        @keyframes cookingBounce1 {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-8px) rotate(10deg); }
+        }
+        @keyframes cookingBounce2 {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-10px) scale(1.2); }
+        }
+        @keyframes cookingBounce3 {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-6px) rotate(-10deg); }
+        }
+        
+        .cooking-text {
+          background: linear-gradient(90deg, #fff, #00ff41, #00ffff, #ff00ff, #fff);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: cookingGradient 3s linear infinite;
+        }
+        
+        @keyframes cookingGradient {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
         }
       `}</style>
     </div>
