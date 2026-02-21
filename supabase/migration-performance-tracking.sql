@@ -218,18 +218,21 @@ BEGIN
           )
         )
       )
-      FROM predictions
-      CROSS JOIN LATERAL (
-        CASE 
-          WHEN ai_probability_over15 >= 50 AND ai_probability_over15 < 60 THEN '50-59'
-          WHEN ai_probability_over15 >= 60 AND ai_probability_over15 < 70 THEN '60-69'
-          WHEN ai_probability_over15 >= 70 AND ai_probability_over15 < 80 THEN '70-79'
-          WHEN ai_probability_over15 >= 80 AND ai_probability_over15 < 90 THEN '80-89'
-          WHEN ai_probability_over15 >= 90 THEN '90-100'
-          ELSE 'unknown'
-        END
-      ) AS band
-      WHERE is_correct IS NOT NULL
+      FROM (
+        SELECT 
+          is_correct,
+          CASE 
+            WHEN ai_probability_over15 >= 50 AND ai_probability_over15 < 60 THEN '50-59'
+            WHEN ai_probability_over15 >= 60 AND ai_probability_over15 < 70 THEN '60-69'
+            WHEN ai_probability_over15 >= 70 AND ai_probability_over15 < 80 THEN '70-79'
+            WHEN ai_probability_over15 >= 80 AND ai_probability_over15 < 90 THEN '80-89'
+            WHEN ai_probability_over15 >= 90 THEN '90-100'
+            ELSE 'unknown'
+          END AS band
+        FROM predictions
+        WHERE is_correct IS NOT NULL
+      ) sub
+      WHERE band != 'unknown'
       GROUP BY band
     )
   ) INTO result
