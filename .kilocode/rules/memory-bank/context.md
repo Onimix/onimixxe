@@ -117,3 +117,4 @@ Date	Time	Match and Result
 | 2026-02-21 | Added performance tracking system with predictions table |
 | 2026-02-21 | Added calibration logic and model performance display |
 | 2026-02-21 | Added date field support to odds and results input |
+| 2026-02-21 | Fixed SQL syntax error in migration (CROSS JOIN LATERAL → subquery) |
