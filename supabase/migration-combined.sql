@@ -136,15 +136,15 @@ BEGIN
     'total_predictions', COUNT(*),
     'total_correct', COUNT(*) FILTER (WHERE is_correct = TRUE),
     'total_accuracy', ROUND(
-      COUNT(*) FILTER (WHERE is_correct = TRUE)::FLOAT / 
-      NULLIF(COUNT(*) FILTER (WHERE is_correct IS NOT NULL), 0) * 100, 
+      (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
+      NULLIF(COUNT(*) FILTER (WHERE is_correct IS NOT NULL), 0) * 100), 
       2
     ),
     'total_profit_loss', COALESCE(SUM(profit_loss), 0),
     'rolling_50_accuracy', (
       SELECT ROUND(
-        COUNT(*) FILTER (WHERE is_correct = TRUE)::FLOAT / 
-        NULLIF(COUNT(*), 0) * 100, 
+        (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
+        NULLIF(COUNT(*), 0) * 100), 
         2
       )
       FROM (
@@ -161,8 +161,8 @@ BEGIN
           'total', COUNT(*),
           'correct', COUNT(*) FILTER (WHERE is_correct = TRUE),
           'accuracy', ROUND(
-            COUNT(*) FILTER (WHERE is_correct = TRUE)::FLOAT / 
-            NULLIF(COUNT(*), 0) * 100, 
+            (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
+            NULLIF(COUNT(*), 0) * 100), 
             2
           )
         )
