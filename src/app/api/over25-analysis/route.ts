@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
   getOver25Results, 
-  insertUpcomingMatch, 
-  getUpcomingMatches,
-  clearUpcomingMatches,
+  insertOver25Prediction,
+  getOver25Predictions,
+  clearOver25Odds,
+  insertOver25Odds,
+  getAllOdds,
 } from '@/lib/supabase';
 import { 
   analyzeUpcomingMatch, 
@@ -48,9 +50,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: overallStats });
     }
 
-    if (action === 'upcoming') {
-      const upcoming = await getUpcomingMatches();
-      return NextResponse.json({ success: true, data: upcoming });
+    if (action === 'predictions') {
+      const predictionsData = await getOver25Predictions();
+      return NextResponse.json({ success: true, data: predictionsData });
+    }
+
+    if (action === 'odds') {
+      const odds = await getAllOdds();
+      return NextResponse.json({ success: true, data: odds });
     }
 
     // Default: return all data
@@ -99,29 +106,6 @@ export async function POST(request: NextRequest) {
       const results = await getOver25Results();
       const analysis = analyzeUpcomingMatch(input, results);
 
-      // Store the upcoming match with analysis
-      const insertResult = await insertUpcomingMatch({
-        match_date: input.match_date || new Date().toISOString().split('T')[0],
-        block_id: input.block_id,
-        home_team: input.home_team,
-        away_team: input.away_team,
-        home_odd: input.home_odd,
-        away_odd: input.away_odd,
-        over25_odd: input.over25_odd,
-        under25_odd: input.under25_odd,
-        bucket_home: analysis.bucket_home,
-        bucket_over25: analysis.bucket_over25,
-        historical_over25_rate: analysis.historical_over25_rate,
-        total_in_bucket: analysis.total_in_bucket,
-        current_streak: analysis.current_streak,
-        streak_type: analysis.streak_type,
-        confidence_indicator: analysis.confidence_indicator,
-      });
-
-      if (!insertResult.success) {
-        console.error('Failed to store upcoming match:', insertResult.error);
-      }
-
       return NextResponse.json({
         success: true,
         data: {
@@ -131,8 +115,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (action === 'clear-upcoming') {
-      const result = await clearUpcomingMatches();
+    if (action === 'store-prediction') {
+      // Store a prediction with analysis
+      const result = await insertOver25Prediction(data);
+      
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, data: result.data });
+    }
+
+    if (action === 'store-odds') {
+      // Store odds for Over 2.5
+      const result = await insertOver25Odds(data);
+      
+      if (!result.success) {
+        return NextResponse.json(
+          { success: false, error: result.error },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'clear-odds') {
+      const result = await clearOver25Odds();
       return NextResponse.json(result);
     }
 

@@ -123,6 +123,15 @@ export interface PredictionRecord {
   calibration_applied?: boolean;
   created_at: string;
   updated_at: string;
+  // Over 2.5 specific fields
+  bucket_home?: string;
+  bucket_over25?: string;
+  historical_over25_rate?: number;
+  total_in_bucket?: number;
+  current_streak?: number;
+  streak_type?: string;
+  confidence_indicator?: string;
+  recommendation?: string;
 }
 
 // Performance metrics

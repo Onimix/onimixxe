@@ -1012,3 +1012,221 @@ export async function upsertOddsPattern(pattern: {
     return { success: false, error: errorMessage };
   }
 }
+
+// =====================================================
+// OVER 2.5 PREDICTIONS (Separate from Over 1.5)
+// =====================================================
+
+/**
+ * Insert Over 2.5 prediction
+ */
+export async function insertOver25Prediction(prediction: {
+  match_date?: string;
+  match_time?: string;
+  home_team?: string;
+  away_team?: string;
+  home_odd?: number;
+  away_odd?: number;
+  over25_odd?: number;
+  under25_odd?: number;
+  bucket_home?: string;
+  bucket_over25?: string;
+  historical_over25_rate?: number;
+  total_in_bucket?: number;
+  current_streak?: number;
+  streak_type?: string;
+  confidence_indicator?: string;
+  recommendation?: string;
+}): Promise<{ success: boolean; error?: string; data?: PredictionRecord }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    // Use the predictions table with a different prediction type
+    const { data, error } = await supabase
+      .from('predictions')
+      .insert({
+        ...prediction,
+        ai_prediction: 'OVER 2.5',
+        league: 'Germany Virtual',
+        goal_line: 2.5,
+        over_odd: prediction.over25_odd,
+        under_odd: prediction.under25_odd,
+        ai_status: prediction.confidence_indicator,
+        ai_probability_over25: prediction.historical_over25_rate,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting Over 2.5 prediction:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting Over 2.5 prediction:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get Over 2.5 predictions with performance stats
+ */
+export async function getOver25Predictions(): Promise<{
+  predictions: PredictionRecord[];
+  performance: {
+    totalPredictions: number;
+    correctPredictions: number;
+    accuracy: number;
+    currentStreak: number;
+    streakType: string;
+  };
+}> {
+  if (!supabase) {
+    return { 
+      predictions: [], 
+      performance: { totalPredictions: 0, correctPredictions: 0, accuracy: 0, currentStreak: 0, streakType: 'none' }
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('predictions')
+      .select('*')
+      .eq('ai_prediction', 'OVER 2.5')
+      .order('prediction_date', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Error fetching Over 2.5 predictions:', error);
+      return { 
+        predictions: [], 
+        performance: { totalPredictions: 0, correctPredictions: 0, accuracy: 0, currentStreak: 0, streakType: 'none' }
+      };
+    }
+
+    const predictions = data || [];
+    
+    // Calculate performance
+    const withResults = predictions.filter(p => p.is_correct !== null && p.is_correct !== undefined);
+    const totalPredictions = withResults.length;
+    const correctPredictions = withResults.filter(p => p.is_correct === true).length;
+    const accuracy = totalPredictions > 0 ? (correctPredictions / totalPredictions) * 100 : 0;
+
+    // Calculate current streak
+    let currentStreak = 0;
+    let streakType = 'none';
+    
+    for (const pred of withResults) {
+      if (currentStreak === 0) {
+        if (pred.is_correct === true) {
+          streakType = 'win';
+          currentStreak = 1;
+        } else if (pred.is_correct === false) {
+          streakType = 'loss';
+          currentStreak = 1;
+        }
+      } else {
+        if ((streakType === 'win' && pred.is_correct === true) ||
+            (streakType === 'loss' && pred.is_correct === false)) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    return {
+      predictions,
+      performance: {
+        totalPredictions,
+        correctPredictions,
+        accuracy,
+        currentStreak,
+        streakType,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching Over 2.5 predictions:', error);
+    return { 
+      predictions: [], 
+      performance: { totalPredictions: 0, correctPredictions: 0, accuracy: 0, currentStreak: 0, streakType: 'none' }
+    };
+  }
+}
+
+/**
+ * Insert Over 2.5 odds
+ */
+export async function insertOver25Odds(oddsData: {
+  home_team?: string;
+  away_team?: string;
+  home_odd?: number;
+  away_odd?: number;
+  over25_odd?: number;
+  under25_odd?: number;
+  match_date?: string;
+  match_time?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('odds')
+      .insert({
+        block_time: oddsData.match_time || '',
+        home_team: oddsData.home_team || 'Unknown',
+        away_team: oddsData.away_team || 'Unknown',
+        home_odd: oddsData.home_odd,
+        away_odd: oddsData.away_odd,
+        over_odd: oddsData.over25_odd,
+        under_odd: oddsData.under25_odd,
+        goal_line: 2.5,
+        match_date: oddsData.match_date,
+        match_time: oddsData.match_time,
+      });
+
+    if (error) {
+      console.error('Error inserting Over 2.5 odds:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting Over 2.5 odds:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Clear Over 2.5 odds
+ */
+export async function clearOver25Odds(): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('odds')
+      .delete()
+      .eq('goal_line', 2.5);
+
+    if (error) {
+      console.error('Error clearing Over 2.5 odds:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error clearing Over 2.5 odds:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}

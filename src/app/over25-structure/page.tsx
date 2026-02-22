@@ -9,7 +9,20 @@ import type {
   UpcomingMatch,
   Over25Analysis,
   UpcomingMatchInput,
+  Odds,
+  Over25Result,
+  PredictionRecord,
 } from '@/lib/types';
+import { 
+  getAllOdds, 
+  getOver25Results, 
+  insertOver25Prediction,
+  getOver25Predictions,
+  clearOver25Odds,
+  insertOver25Odds,
+} from '@/lib/supabase';
+import { analyzeUpcomingMatch, getOver25OddBucket, getHomeOddBucket } from '@/lib/over25-analysis';
+import { DEFAULT_BUCKET_CONFIG } from '@/lib/types';
 
 // Matrix characters for edges
 const matrixChars = '01アイウエオカキクケコ';
@@ -28,7 +41,6 @@ export default function Over25StructurePage() {
   const [over25OddBuckets, setOver25OddBuckets] = useState<BucketPerformance[]>([]);
   const [patterns, setPatterns] = useState<OddsPattern[]>([]);
   const [dayPerformance, setDayPerformance] = useState<DayBlockPerformance[]>([]);
-  const [upcomingMatches, setUpcomingMatches] = useState<UpcomingMatch[]>([]);
   const [overallStats, setOverallStats] = useState<{
     totalMatches: number;
     over25Hits: number;
@@ -37,23 +49,41 @@ export default function Over25StructurePage() {
     streakType: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Shared data from Over 1.5 dashboard (results)
+  const [results, setResults] = useState<Over25Result[]>([]);
+  
+  // Over 2.5 specific odds and predictions
+  const [over25Odds, setOver25Odds] = useState<Odds[]>([]);
+  const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
+  
+  // Performance tracking
+  const [performanceStats, setPerformanceStats] = useState<{
+    totalPredictions: number;
+    correctPredictions: number;
+    accuracy: number;
+    currentStreak: number;
+    streakType: string;
+  } | null>(null);
 
-  // Form state for new match input
-  const [formData, setFormData] = useState<UpcomingMatchInput>({
-    home_odd: 0,
-    away_odd: 0,
-    over25_odd: 0,
-    under25_odd: 0,
+  // Form state for new odds input
+  const [oddsForm, setOddsForm] = useState({
     home_team: '',
     away_team: '',
-    block_id: '',
+    home_odd: '',
+    away_odd: '',
+    over25_odd: '',
+    under25_odd: '',
+    match_date: new Date().toISOString().split('T')[0],
+    match_time: '',
   });
-  const [analysisResult, setAnalysisResult] = useState<Over25Analysis | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Load analysis data from API
       const response = await fetch('/api/over25-analysis');
       const result = await response.json();
       
@@ -63,13 +93,22 @@ export default function Over25StructurePage() {
         setPatterns(result.data.patterns);
         setDayPerformance(result.data.dayPerformance);
         setOverallStats(result.data.overallStats);
+        setResults(result.data.results);
       }
 
-      // Load upcoming matches
-      const upcomingResponse = await fetch('/api/over25-analysis?action=upcoming');
-      const upcomingResult = await upcomingResponse.json();
-      if (upcomingResult.success) {
-        setUpcomingMatches(upcomingResult.data);
+      // Load Over 2.5 predictions
+      const predictionsResponse = await fetch('/api/over25-analysis?action=predictions');
+      const predictionsResult = await predictionsResponse.json();
+      if (predictionsResult.success) {
+        setPredictions(predictionsResult.data.predictions);
+        setPerformanceStats(predictionsResult.data.performance);
+      }
+      
+      // Load Over 2.5 odds
+      const oddsResponse = await fetch('/api/over25-analysis?action=odds');
+      const oddsResult = await oddsResponse.json();
+      if (oddsResult.success) {
+        setOver25Odds(oddsResult.data);
       }
     } catch (error) {
       console.error('Error loading Over 2.5 data:', error);
@@ -82,43 +121,86 @@ export default function Over25StructurePage() {
     loadData();
   }, [loadData]);
 
-  const handleAnalyzeMatch = async (e: React.FormEvent) => {
+  const handleOddsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsAnalyzing(true);
+    setIsSubmitting(true);
     
     try {
-      const response = await fetch('/api/over25-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'analyze',
-          data: formData,
-        }),
-      });
+      const oddsData = {
+        home_team: oddsForm.home_team,
+        away_team: oddsForm.away_team,
+        home_odd: parseFloat(oddsForm.home_odd),
+        away_odd: parseFloat(oddsForm.away_odd),
+        over25_odd: parseFloat(oddsForm.over25_odd),
+        under25_odd: parseFloat(oddsForm.under25_odd),
+        match_date: oddsForm.match_date,
+        match_time: oddsForm.match_time,
+      };
       
-      const result = await response.json();
+      // Store odds
+      const storeResult = await insertOver25Odds(oddsData);
       
-      if (result.success) {
-        setAnalysisResult(result.data.analysis);
-        loadData(); // Refresh data
+      if (storeResult.success) {
+        // Analyze and create prediction
+        const analysis = analyzeUpcomingMatch(
+          {
+            home_odd: oddsData.home_odd,
+            away_odd: oddsData.away_odd,
+            over25_odd: oddsData.over25_odd,
+            under25_odd: oddsData.under25_odd,
+            home_team: oddsData.home_team,
+            away_team: oddsData.away_team,
+            match_date: oddsData.match_date,
+          },
+          results
+        );
+        
+        // Store prediction
+        await insertOver25Prediction({
+          match_date: oddsData.match_date,
+          match_time: oddsData.match_time,
+          home_team: oddsData.home_team,
+          away_team: oddsData.away_team,
+          home_odd: oddsData.home_odd,
+          away_odd: oddsData.away_odd,
+          over25_odd: oddsData.over25_odd,
+          under25_odd: oddsData.under25_odd,
+          bucket_home: analysis.bucket_home,
+          bucket_over25: analysis.bucket_over25,
+          historical_over25_rate: analysis.historical_over25_rate,
+          total_in_bucket: analysis.total_in_bucket,
+          current_streak: analysis.current_streak,
+          streak_type: analysis.streak_type,
+          confidence_indicator: analysis.confidence_indicator,
+          recommendation: analysis.recommendation,
+        });
+        
+        // Reset form
+        setOddsForm({
+          home_team: '',
+          away_team: '',
+          home_odd: '',
+          away_odd: '',
+          over25_odd: '',
+          under25_odd: '',
+          match_date: new Date().toISOString().split('T')[0],
+          match_time: '',
+        });
+        
+        // Reload data
+        loadData();
       }
     } catch (error) {
-      console.error('Error analyzing match:', error);
+      console.error('Error submitting odds:', error);
     } finally {
-      setIsAnalyzing(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleClearUpcoming = async () => {
-    try {
-      await fetch('/api/over25-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear-upcoming' }),
-      });
-      setUpcomingMatches([]);
-    } catch (error) {
-      console.error('Error clearing upcoming matches:', error);
+  const handleClearOdds = async () => {
+    if (confirm('Are you sure you want to clear all Over 2.5 odds?')) {
+      await clearOver25Odds();
+      loadData();
     }
   };
 
@@ -151,43 +233,43 @@ export default function Over25StructurePage() {
       <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-[length:200%_100%] animate-gradient py-4">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">
-            🎯 Over 2.5 Structure Analysis
+            🎯 Over 2.5 Prediction Dashboard
           </h1>
           <Link 
             href="/" 
             className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
           >
-            ← Back to Dashboard
+            ← Back to Over 1.5
           </Link>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 py-8 pb-32">
-        {/* Overall Stats */}
-        {overallStats && (
+        {/* Performance Stats */}
+        {performanceStats && (
           <section className="mb-8">
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-              <h2 className="text-2xl font-bold text-white mb-4">📊 Overall Statistics</h2>
+              <h2 className="text-2xl font-bold text-white mb-4">📈 Prediction Performance</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-slate-700/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-white">{overallStats.totalMatches}</div>
-                  <div className="text-slate-400 text-sm">Total Matches</div>
+                  <div className="text-3xl font-bold text-white">{performanceStats.totalPredictions}</div>
+                  <div className="text-slate-400 text-sm">Total Predictions</div>
                 </div>
                 <div className="bg-slate-700/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-green-400">{overallStats.over25Hits}</div>
-                  <div className="text-slate-400 text-sm">Over 2.5 Hits</div>
+                  <div className="text-3xl font-bold text-green-400">{performanceStats.correctPredictions}</div>
+                  <div className="text-slate-400 text-sm">Correct</div>
                 </div>
                 <div className="bg-slate-700/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-blue-400">{overallStats.over25Rate.toFixed(1)}%</div>
-                  <div className="text-slate-400 text-sm">Over 2.5 Rate</div>
+                  <div className="text-3xl font-bold text-blue-400">{performanceStats.accuracy.toFixed(1)}%</div>
+                  <div className="text-slate-400 text-sm">Accuracy</div>
                 </div>
                 <div className="bg-slate-700/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-yellow-400">{overallStats.currentStreak}</div>
+                  <div className="text-3xl font-bold text-yellow-400">{performanceStats.currentStreak}</div>
                   <div className="text-slate-400 text-sm">Current Streak</div>
                 </div>
                 <div className="bg-slate-700/50 rounded-xl p-4 text-center">
-                  <div className={`text-3xl font-bold ${overallStats.streakType === 'over' ? 'text-green-400' : 'text-red-400'}`}>
-                    {overallStats.streakType.toUpperCase()}
+                  <div className={`text-3xl font-bold ${performanceStats.streakType === 'over' ? 'text-green-400' : 'text-red-400'}`}>
+                    {performanceStats.streakType.toUpperCase()}
                   </div>
                   <div className="text-slate-400 text-sm">Streak Type</div>
                 </div>
@@ -196,18 +278,67 @@ export default function Over25StructurePage() {
           </section>
         )}
 
-        {/* Match Input Form */}
+        {/* Odds Input Section */}
         <section className="mb-8">
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <h2 className="text-2xl font-bold text-white mb-4">🔍 Analyze Upcoming Match</h2>
-            <form onSubmit={handleAnalyzeMatch} className="grid md:grid-cols-4 gap-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-white">📝 Input Over 2.5 Odds</h2>
+              <button
+                onClick={handleClearOdds}
+                className="text-red-400 hover:text-red-300 text-sm"
+              >
+                Clear All Odds
+              </button>
+            </div>
+            
+            <form onSubmit={handleOddsSubmit} className="grid md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Match Date</label>
+                <input
+                  type="date"
+                  value={oddsForm.match_date}
+                  onChange={(e) => setOddsForm({ ...oddsForm, match_date: e.target.value })}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Match Time</label>
+                <input
+                  type="text"
+                  value={oddsForm.match_time}
+                  onChange={(e) => setOddsForm({ ...oddsForm, match_time: e.target.value })}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 14:30"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Home Team</label>
+                <input
+                  type="text"
+                  value={oddsForm.home_team}
+                  onChange={(e) => setOddsForm({ ...oddsForm, home_team: e.target.value })}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., BVB"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 text-sm mb-1">Away Team</label>
+                <input
+                  type="text"
+                  value={oddsForm.away_team}
+                  onChange={(e) => setOddsForm({ ...oddsForm, away_team: e.target.value })}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., SCF"
+                />
+              </div>
               <div>
                 <label className="block text-slate-400 text-sm mb-1">Home Odd</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.home_odd || ''}
-                  onChange={(e) => setFormData({ ...formData, home_odd: parseFloat(e.target.value) || 0 })}
+                  value={oddsForm.home_odd}
+                  onChange={(e) => setOddsForm({ ...oddsForm, home_odd: e.target.value })}
                   className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., 1.50"
                   required
@@ -218,8 +349,8 @@ export default function Over25StructurePage() {
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.away_odd || ''}
-                  onChange={(e) => setFormData({ ...formData, away_odd: parseFloat(e.target.value) || 0 })}
+                  value={oddsForm.away_odd}
+                  onChange={(e) => setOddsForm({ ...oddsForm, away_odd: e.target.value })}
                   className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., 2.50"
                   required
@@ -230,8 +361,8 @@ export default function Over25StructurePage() {
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.over25_odd || ''}
-                  onChange={(e) => setFormData({ ...formData, over25_odd: parseFloat(e.target.value) || 0 })}
+                  value={oddsForm.over25_odd}
+                  onChange={(e) => setOddsForm({ ...oddsForm, over25_odd: e.target.value })}
                   className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., 1.65"
                   required
@@ -242,71 +373,101 @@ export default function Over25StructurePage() {
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.under25_odd || ''}
-                  onChange={(e) => setFormData({ ...formData, under25_odd: parseFloat(e.target.value) || 0 })}
+                  value={oddsForm.under25_odd}
+                  onChange={(e) => setOddsForm({ ...oddsForm, under25_odd: e.target.value })}
                   className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., 2.20"
                   required
                 />
               </div>
-              <div className="md:col-span-4 flex gap-4">
+              <div className="md:col-span-4">
                 <button
                   type="submit"
-                  disabled={isAnalyzing}
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-2 px-6 rounded-lg transition-all disabled:opacity-50"
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
                 >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze Match'}
+                  {isSubmitting ? 'Processing...' : '📊 Analyze & Store Prediction'}
                 </button>
               </div>
             </form>
-
-            {/* Analysis Result */}
-            {analysisResult && (
-              <div className="mt-6 p-4 bg-slate-700/50 rounded-xl border border-slate-600">
-                <h3 className="text-lg font-bold text-white mb-3">📈 Analysis Result</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <div className="text-slate-400 text-sm">Home Odd Bucket</div>
-                    <div className="text-white font-bold">{analysisResult.bucket_home}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-sm">Over 2.5 Odd Bucket</div>
-                    <div className="text-white font-bold">{analysisResult.bucket_over25}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-sm">Historical Over 2.5 Rate</div>
-                    <div className={`font-bold ${analysisResult.historical_over25_rate >= 60 ? 'text-green-400' : 'text-yellow-400'}`}>
-                      {analysisResult.historical_over25_rate}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-sm">Matches in Bucket</div>
-                    <div className="text-white font-bold">{analysisResult.total_in_bucket}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-sm">Current Streak</div>
-                    <div className="text-white font-bold">{analysisResult.current_streak} {analysisResult.streak_type}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-sm">Confidence</div>
-                    <div className={`font-bold ${
-                      analysisResult.confidence_indicator === 'HIGH' ? 'text-green-400' :
-                      analysisResult.confidence_indicator === 'MEDIUM' ? 'text-yellow-400' : 'text-red-400'
-                    }`}>
-                      {analysisResult.confidence_indicator}
-                    </div>
-                  </div>
-                  {analysisResult.recommendation && (
-                    <div className="md:col-span-2">
-                      <div className="text-slate-400 text-sm">Recommendation</div>
-                      <div className="text-white font-bold">{analysisResult.recommendation}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </section>
+
+        {/* Active Predictions */}
+        {predictions.length > 0 && (
+          <section className="mb-8">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+              <h2 className="text-2xl font-bold text-white mb-4">🎯 Active Predictions</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-slate-400 border-b border-slate-600">
+                      <th className="text-left py-2">Date/Time</th>
+                      <th className="text-left py-2">Match</th>
+                      <th className="text-center py-2">Odds</th>
+                      <th className="text-center py-2">Bucket</th>
+                      <th className="text-center py-2">Hist. Rate</th>
+                      <th className="text-center py-2">Confidence</th>
+                      <th className="text-center py-2">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {predictions.map((pred, i) => (
+                      <tr key={i} className="border-b border-slate-700/50">
+                        <td className="py-3 text-white">
+                          <div>{pred.match_date || '-'}</div>
+                          <div className="text-slate-400 text-xs">{pred.match_time || '-'}</div>
+                        </td>
+                        <td className="py-3 text-white">
+                          <div className="font-medium">{pred.home_team} vs {pred.away_team}</div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <div className="text-slate-300">
+                            H: {pred.home_odd?.toFixed(2)} | A: {pred.away_odd?.toFixed(2)}
+                          </div>
+                          <div className="text-blue-400 text-xs">
+                            O2.5: {pred.over_odd?.toFixed(2)}
+                          </div>
+                        </td>
+                        <td className="py-3 text-center text-slate-300">
+                          <div>{pred.bucket_home || '-'}</div>
+                          <div className="text-xs text-blue-400">{pred.bucket_over25 || '-'}</div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <span className={`font-bold ${(pred.historical_over25_rate || 0) >= 60 ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {pred.historical_over25_rate?.toFixed(1) || '-'}%
+                          </span>
+                          <div className="text-slate-400 text-xs">({pred.total_in_bucket || 0} matches)</div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            pred.confidence_indicator === 'HIGH' ? 'bg-green-500/20 text-green-400' :
+                            pred.confidence_indicator === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' : 
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {pred.confidence_indicator || 'LOW'}
+                          </span>
+                        </td>
+                        <td className="py-3 text-center">
+                          {pred.final_result_over25 !== null && pred.final_result_over25 !== undefined ? (
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${pred.final_result_over25 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {pred.final_result_over25 ? 'OVER' : 'UNDER'}
+                              {pred.is_correct !== null && pred.is_correct !== undefined && (
+                                <span className="ml-1">{pred.is_correct ? '✓' : '✗'}</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-xs">Pending</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
 
         {isLoading ? (
           <div className="animate-pulse space-y-8">
@@ -316,6 +477,39 @@ export default function Over25StructurePage() {
           </div>
         ) : (
           <>
+            {/* Overall Stats */}
+            {overallStats && (
+              <section className="mb-8">
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+                  <h2 className="text-2xl font-bold text-white mb-4">📊 Historical Statistics (From Dashboard 1)</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <div className="text-3xl font-bold text-white">{overallStats.totalMatches}</div>
+                      <div className="text-slate-400 text-sm">Total Matches</div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <div className="text-3xl font-bold text-green-400">{overallStats.over25Hits}</div>
+                      <div className="text-slate-400 text-sm">Over 2.5 Hits</div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <div className="text-3xl font-bold text-blue-400">{overallStats.over25Rate.toFixed(1)}%</div>
+                      <div className="text-slate-400 text-sm">Over 2.5 Rate</div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <div className="text-3xl font-bold text-yellow-400">{overallStats.currentStreak}</div>
+                      <div className="text-slate-400 text-sm">Current Streak</div>
+                    </div>
+                    <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                      <div className={`text-3xl font-bold ${overallStats.streakType === 'over' ? 'text-green-400' : 'text-red-400'}`}>
+                        {overallStats.streakType.toUpperCase()}
+                      </div>
+                      <div className="text-slate-400 text-sm">Streak Type</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Bucket Performance Tables */}
             <section className="mb-8">
               <div className="grid md:grid-cols-2 gap-6">
@@ -446,85 +640,21 @@ export default function Over25StructurePage() {
                 </div>
               </div>
             </section>
-
-            {/* Upcoming Matches */}
-            {upcomingMatches.length > 0 && (
-              <section className="mb-8">
-                <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-bold text-white">🎯 Analyzed Matches</h2>
-                    <button
-                      onClick={handleClearUpcoming}
-                      className="text-red-400 hover:text-red-300 text-sm"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-slate-400 border-b border-slate-600">
-                          <th className="text-left py-2">Date</th>
-                          <th className="text-left py-2">Home Odd</th>
-                          <th className="text-left py-2">Over 2.5 Odd</th>
-                          <th className="text-right py-2">Historical %</th>
-                          <th className="text-right py-2">Confidence</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {upcomingMatches.map((match, i) => (
-                          <tr key={i} className="border-b border-slate-700/50">
-                            <td className="py-2 text-white">{match.match_date}</td>
-                            <td className="py-2 text-white">{match.home_odd}</td>
-                            <td className="py-2 text-white">{match.over25_odd}</td>
-                            <td className={`py-2 text-right font-bold ${(match.historical_over25_rate || 0) >= 60 ? 'text-green-400' : 'text-yellow-400'}`}>
-                              {match.historical_over25_rate?.toFixed(1) || '-'}%
-                            </td>
-                            <td className={`py-2 text-right font-bold ${
-                              match.confidence_indicator === 'HIGH' ? 'text-green-400' :
-                              match.confidence_indicator === 'MEDIUM' ? 'text-yellow-400' : 'text-red-400'
-                            }`}>
-                              {match.confidence_indicator}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
-            )}
           </>
         )}
       </main>
 
-      <style jsx global>{`
-        @keyframes matrixFallDown {
-          0% { transform: translateY(-20px); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translateY(100vh); opacity: 0; }
-        }
-        
-        .matrix-char {
-          animation: matrixFlicker 0.15s ease-in-out infinite;
-        }
-        
-        @keyframes matrixFlicker {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
-        }
-        
-        @keyframes gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        
-        .animate-gradient {
-          animation: gradient 3s ease infinite;
-        }
-      `}</style>
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-sm border-t border-slate-700 py-3">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+          <div className="text-slate-400 text-sm">
+            📊 Data from Dashboard 1: {results.length} results loaded
+          </div>
+          <div className="text-slate-400 text-sm">
+            🎯 Over 2.5 Predictions: {predictions.length} active
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
