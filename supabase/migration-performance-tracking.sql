@@ -182,62 +182,86 @@ CREATE OR REPLACE FUNCTION calculate_performance_metrics()
 RETURNS JSONB AS $$
 DECLARE
   result JSONB;
+  total_pred BIGINT;
+  total_corr BIGINT;
+  total_acc NUMERIC;
+  total_pl FLOAT;
+  roll_acc NUMERIC;
+  bands JSONB;
 BEGIN
-  SELECT jsonb_build_object(
-    'total_predictions', COUNT(*),
-    'total_correct', COUNT(*) FILTER (WHERE is_correct = TRUE),
-    'total_accuracy', ROUND(
-      (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
-      NULLIF(COUNT(*) FILTER (WHERE is_correct IS NOT NULL), 0) * 100), 
-      2
-    ),
-    'total_profit_loss', COALESCE(SUM(profit_loss), 0),
-    'rolling_50_accuracy', (
-      SELECT ROUND(
-        (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
-        NULLIF(COUNT(*), 0) * 100), 
-        2
-      )
-      FROM (
-        SELECT is_correct FROM predictions 
-        WHERE is_correct IS NOT NULL 
-        ORDER BY prediction_date DESC 
-        LIMIT 50
-      ) subq
-    ),
-    'probability_bands', (
-      SELECT jsonb_object_agg(
-        band,
-        jsonb_build_object(
-          'total', COUNT(*),
-          'correct', COUNT(*) FILTER (WHERE is_correct = TRUE),
-          'accuracy', ROUND(
-            (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
-            NULLIF(COUNT(*), 0) * 100), 
-            2
-          )
-        )
-      )
-      FROM (
-        SELECT 
-          is_correct,
-          CASE 
-            WHEN ai_probability_over15 >= 50 AND ai_probability_over15 < 60 THEN '50-59'
-            WHEN ai_probability_over15 >= 60 AND ai_probability_over15 < 70 THEN '60-69'
-            WHEN ai_probability_over15 >= 70 AND ai_probability_over15 < 80 THEN '70-79'
-            WHEN ai_probability_over15 >= 80 AND ai_probability_over15 < 90 THEN '80-89'
-            WHEN ai_probability_over15 >= 90 THEN '90-100'
-            ELSE 'unknown'
-          END AS band
-        FROM predictions
-        WHERE is_correct IS NOT NULL
-      ) sub
-      WHERE band != 'unknown'
-      GROUP BY band
-    )
-  ) INTO result
+  -- Calculate overall stats
+  SELECT 
+    COUNT(*),
+    COUNT(*) FILTER (WHERE is_correct = TRUE)
+  INTO total_pred, total_corr
   FROM predictions
   WHERE is_correct IS NOT NULL;
+  
+  total_acc := ROUND(
+    (total_corr::NUMERIC / NULLIF(total_pred, 0) * 100), 
+    2
+  );
+  
+  -- Calculate total profit/loss
+  SELECT COALESCE(SUM(profit_loss), 0) INTO total_pl
+  FROM predictions
+  WHERE is_correct IS NOT NULL;
+  
+  -- Calculate rolling 50 accuracy
+  SELECT ROUND(
+    (COUNT(*) FILTER (WHERE is_correct = TRUE)::NUMERIC / 
+    NULLIF(COUNT(*), 0) * 100), 
+    2
+  )
+  INTO roll_acc
+  FROM (
+    SELECT is_correct FROM predictions 
+    WHERE is_correct IS NOT NULL 
+    ORDER BY prediction_date DESC 
+    LIMIT 50
+  ) subq;
+  
+  -- Calculate probability bands (using subquery to avoid nested aggregate)
+  SELECT COALESCE(
+    (SELECT jsonb_object_agg(band, band_data)
+     FROM (
+       SELECT 
+         band,
+         jsonb_build_object(
+           'total', cnt,
+           'correct', corr,
+           'accuracy', ROUND((corr::NUMERIC / NULLIF(cnt, 0) * 100), 2)
+         ) AS band_data
+       FROM (
+         SELECT 
+           CASE 
+             WHEN ai_probability_over15 >= 50 AND ai_probability_over15 < 60 THEN '50-59'
+             WHEN ai_probability_over15 >= 60 AND ai_probability_over15 < 70 THEN '60-69'
+             WHEN ai_probability_over15 >= 70 AND ai_probability_over15 < 80 THEN '70-79'
+             WHEN ai_probability_over15 >= 80 AND ai_probability_over15 < 90 THEN '80-89'
+             WHEN ai_probability_over15 >= 90 THEN '90-100'
+             ELSE 'unknown'
+           END AS band,
+           COUNT(*) AS cnt,
+           COUNT(*) FILTER (WHERE is_correct = TRUE) AS corr
+         FROM predictions
+         WHERE is_correct IS NOT NULL
+         GROUP BY band
+       ) sub
+       WHERE band != 'unknown'
+    ) bands_sub),
+    '{}'::jsonb
+  ) INTO bands;
+  
+  -- Build final result
+  result := jsonb_build_object(
+    'total_predictions', total_pred,
+    'total_correct', total_corr,
+    'total_accuracy', total_acc,
+    'total_profit_loss', total_pl,
+    'rolling_50_accuracy', roll_acc,
+    'probability_bands', bands
+  );
   
   RETURN result;
 END;
