@@ -92,6 +92,7 @@ export default function Home() {
     over15Rate: 0,
     over25Rate: 0,
   });
+  const [totalResultsCount, setTotalResultsCount] = useState(0);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,6 +112,7 @@ export default function Home() {
       setOdds(oddsData);
       setHistoricalStats(statsData);
       setPerformanceMetrics(metricsData);
+      setTotalResultsCount(resultsData.length);
 
       // Generate predictions for each odd with calibration
       if (oddsData.length > 0 && resultsData.length > 0) {
@@ -305,6 +307,23 @@ export default function Home() {
             ) : (
               <HistoricalStatsPanel stats={historicalStats} />
             )}
+          </div>
+        </section>
+
+        {/* Results Count Display */}
+        <section className="mb-10">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+              📊 Results Count
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                <div className="text-4xl font-bold text-white">
+                  {totalResultsCount}
+                </div>
+                <div className="text-slate-400 text-sm">Total Results Uploaded</div>
+              </div>
+            </div>
           </div>
         </section>
 
