@@ -148,6 +148,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result);
     }
 
+    if (action === 'store-bulk-predictions') {
+      // Store multiple predictions at once
+      const predictions = body.predictions;
+      
+      if (!Array.isArray(predictions) || predictions.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No predictions provided' },
+          { status: 400 }
+        );
+      }
+
+      let successCount = 0;
+      const errors: string[] = [];
+
+      for (const pred of predictions) {
+        const result = await insertOver25Prediction({
+          match_date: pred.match_date,
+          match_time: pred.match_time,
+          home_team: pred.home_team,
+          away_team: pred.away_team,
+          home_odd: pred.home_odd,
+          away_odd: pred.away_odd,
+          over25_odd: pred.over25_odd,
+          under25_odd: pred.under25_odd,
+          bucket_home: pred.bucket_home,
+          bucket_over25: pred.bucket_over25,
+          historical_over25_rate: pred.historical_over25_rate,
+          total_in_bucket: pred.total_in_bucket,
+          current_streak: pred.current_streak,
+          streak_type: pred.streak_type,
+          confidence_indicator: pred.confidence_indicator,
+          recommendation: pred.recommendation,
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          errors.push(`${pred.home_team} vs ${pred.away_team}: ${result.error}`);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          total: predictions.length,
+          stored: successCount,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      });
+    }
+
     return NextResponse.json(
       { success: false, error: 'Invalid action' },
       { status: 400 }

@@ -6,23 +6,17 @@ import type {
   BucketPerformance, 
   OddsPattern, 
   DayBlockPerformance, 
-  UpcomingMatch,
   Over25Analysis,
-  UpcomingMatchInput,
-  Odds,
   Over25Result,
   PredictionRecord,
+  ParsedOver25Odds,
 } from '@/lib/types';
 import { 
-  getAllOdds, 
   getOver25Results, 
-  insertOver25Prediction,
   getOver25Predictions,
-  clearOver25Odds,
-  insertOver25Odds,
 } from '@/lib/supabase';
-import { analyzeUpcomingMatch, getOver25OddBucket, getHomeOddBucket } from '@/lib/over25-analysis';
-import { DEFAULT_BUCKET_CONFIG } from '@/lib/types';
+import { analyzeUpcomingMatch } from '@/lib/over25-analysis';
+import Over25OddsInput from '@/components/Over25OddsInput';
 
 // Matrix characters for edges
 const matrixChars = '01アイウエオカキクケコ';
@@ -53,8 +47,7 @@ export default function Over25StructurePage() {
   // Shared data from Over 1.5 dashboard (results)
   const [results, setResults] = useState<Over25Result[]>([]);
   
-  // Over 2.5 specific odds and predictions
-  const [over25Odds, setOver25Odds] = useState<Odds[]>([]);
+  // Over 2.5 predictions
   const [predictions, setPredictions] = useState<PredictionRecord[]>([]);
   
   // Performance tracking
@@ -65,20 +58,6 @@ export default function Over25StructurePage() {
     currentStreak: number;
     streakType: string;
   } | null>(null);
-
-  // Form state for new odds input
-  const [oddsForm, setOddsForm] = useState({
-    home_team: '',
-    away_team: '',
-    home_odd: '',
-    away_odd: '',
-    over25_odd: '',
-    under25_odd: '',
-    match_date: new Date().toISOString().split('T')[0],
-    match_time: '',
-  });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -103,13 +82,6 @@ export default function Over25StructurePage() {
         setPredictions(predictionsResult.data.predictions);
         setPerformanceStats(predictionsResult.data.performance);
       }
-      
-      // Load Over 2.5 odds
-      const oddsResponse = await fetch('/api/over25-analysis?action=odds');
-      const oddsResult = await oddsResponse.json();
-      if (oddsResult.success) {
-        setOver25Odds(oddsResult.data);
-      }
     } catch (error) {
       console.error('Error loading Over 2.5 data:', error);
     } finally {
@@ -121,87 +93,9 @@ export default function Over25StructurePage() {
     loadData();
   }, [loadData]);
 
-  const handleOddsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    try {
-      const oddsData = {
-        home_team: oddsForm.home_team,
-        away_team: oddsForm.away_team,
-        home_odd: parseFloat(oddsForm.home_odd),
-        away_odd: parseFloat(oddsForm.away_odd),
-        over25_odd: parseFloat(oddsForm.over25_odd),
-        under25_odd: parseFloat(oddsForm.under25_odd),
-        match_date: oddsForm.match_date,
-        match_time: oddsForm.match_time,
-      };
-      
-      // Store odds
-      const storeResult = await insertOver25Odds(oddsData);
-      
-      if (storeResult.success) {
-        // Analyze and create prediction
-        const analysis = analyzeUpcomingMatch(
-          {
-            home_odd: oddsData.home_odd,
-            away_odd: oddsData.away_odd,
-            over25_odd: oddsData.over25_odd,
-            under25_odd: oddsData.under25_odd,
-            home_team: oddsData.home_team,
-            away_team: oddsData.away_team,
-            match_date: oddsData.match_date,
-          },
-          results
-        );
-        
-        // Store prediction
-        await insertOver25Prediction({
-          match_date: oddsData.match_date,
-          match_time: oddsData.match_time,
-          home_team: oddsData.home_team,
-          away_team: oddsData.away_team,
-          home_odd: oddsData.home_odd,
-          away_odd: oddsData.away_odd,
-          over25_odd: oddsData.over25_odd,
-          under25_odd: oddsData.under25_odd,
-          bucket_home: analysis.bucket_home,
-          bucket_over25: analysis.bucket_over25,
-          historical_over25_rate: analysis.historical_over25_rate,
-          total_in_bucket: analysis.total_in_bucket,
-          current_streak: analysis.current_streak,
-          streak_type: analysis.streak_type,
-          confidence_indicator: analysis.confidence_indicator,
-          recommendation: analysis.recommendation,
-        });
-        
-        // Reset form
-        setOddsForm({
-          home_team: '',
-          away_team: '',
-          home_odd: '',
-          away_odd: '',
-          over25_odd: '',
-          under25_odd: '',
-          match_date: new Date().toISOString().split('T')[0],
-          match_time: '',
-        });
-        
-        // Reload data
-        loadData();
-      }
-    } catch (error) {
-      console.error('Error submitting odds:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleClearOdds = async () => {
-    if (confirm('Are you sure you want to clear all Over 2.5 odds?')) {
-      await clearOver25Odds();
-      loadData();
-    }
+  const handleOddsSubmitted = (newPredictions: Over25Analysis[]) => {
+    // Reload data to show updated predictions
+    loadData();
   };
 
   return (
@@ -278,118 +172,17 @@ export default function Over25StructurePage() {
           </section>
         )}
 
-        {/* Odds Input Section */}
+        {/* Bulk Odds Input Section */}
         <section className="mb-8">
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white">📝 Input Over 2.5 Odds</h2>
-              <button
-                onClick={handleClearOdds}
-                className="text-red-400 hover:text-red-300 text-sm"
-              >
-                Clear All Odds
-              </button>
-            </div>
-            
-            <form onSubmit={handleOddsSubmit} className="grid md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Match Date</label>
-                <input
-                  type="date"
-                  value={oddsForm.match_date}
-                  onChange={(e) => setOddsForm({ ...oddsForm, match_date: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Match Time</label>
-                <input
-                  type="text"
-                  value={oddsForm.match_time}
-                  onChange={(e) => setOddsForm({ ...oddsForm, match_time: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 14:30"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Home Team</label>
-                <input
-                  type="text"
-                  value={oddsForm.home_team}
-                  onChange={(e) => setOddsForm({ ...oddsForm, home_team: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., BVB"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Away Team</label>
-                <input
-                  type="text"
-                  value={oddsForm.away_team}
-                  onChange={(e) => setOddsForm({ ...oddsForm, away_team: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., SCF"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Home Odd</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={oddsForm.home_odd}
-                  onChange={(e) => setOddsForm({ ...oddsForm, home_odd: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 1.50"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Away Odd</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={oddsForm.away_odd}
-                  onChange={(e) => setOddsForm({ ...oddsForm, away_odd: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 2.50"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Over 2.5 Odd</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={oddsForm.over25_odd}
-                  onChange={(e) => setOddsForm({ ...oddsForm, over25_odd: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 1.65"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 text-sm mb-1">Under 2.5 Odd</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={oddsForm.under25_odd}
-                  onChange={(e) => setOddsForm({ ...oddsForm, under25_odd: e.target.value })}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 2.20"
-                  required
-                />
-              </div>
-              <div className="md:col-span-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Processing...' : '📊 Analyze & Store Prediction'}
-                </button>
-              </div>
-            </form>
+            <h2 className="text-2xl font-bold text-white mb-4">📝 Bulk Odds Input (Tab-Separated)</h2>
+            <p className="text-slate-400 text-sm mb-4">
+              Paste multiple matches at once. Format: Date, Time, Home, Away, HomeOdd, AwayOdd, Over2.5, Under2.5
+            </p>
+            <Over25OddsInput 
+              results={results} 
+              onOddsSubmitted={handleOddsSubmitted}
+            />
           </div>
         </section>
 

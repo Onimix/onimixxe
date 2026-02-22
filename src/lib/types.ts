@@ -309,3 +309,15 @@ export interface DayBlockPerformance {
   over25_hits: number;
   over25_rate: number;
 }
+
+// Parsed Over 2.5 odds from bulk input
+export interface ParsedOver25Odds {
+  match_date: string;
+  match_time: string;
+  home_team: string;
+  away_team: string;
+  home_odd: number;
+  away_odd: number;
+  over25_odd: number;
+  under25_odd: number;
+}
