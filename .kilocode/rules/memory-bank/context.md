@@ -44,6 +44,10 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 | `supabase/schema.sql` | DB schema | ✅ Ready |
 | `supabase/migration-performance-tracking.sql` | Performance migration | ✅ Ready |
 | `supabase/migration-cleanup-results.sql` | Results cleanup migration | ✅ Ready |
+| `supabase/migration-over25-tracking.sql` | Over 2.5 tracking migration | ✅ Ready |
+| `src/lib/over25-analysis.ts` | Over 2.5 analysis engine | ✅ Ready |
+| `src/app/api/over25-analysis/route.ts` | Over 2.5 API route | ✅ Ready |
+| `src/app/over25-structure/page.tsx` | Over 2.5 analytics page | ✅ Ready |
 | `.env.example` | Environment template | ✅ Ready |
 
 ## Current Focus
@@ -126,3 +130,4 @@ Date	Time	Match and Result
 | 2026-02-21 | Added collapsible Data Input Panel with expand/collapse button |
 | 2026-02-21 | Added "Buy Me A Coffee" button and animated "Onimix is cooking" footer |
 | 2026-02-21 | Created results cleanup migration SQL to delete results without dates |
+| 2026-02-22 | Added independent Over 2.5 tracking system with bucket analysis |
