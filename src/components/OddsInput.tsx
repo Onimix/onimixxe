@@ -52,10 +52,10 @@ export default function OddsInput({ onOddsSubmitted }: OddsInputProps) {
     setMessage(null);
   };
 
-  // Updated sample with date column
-  const sampleData = `Date\tTime\tEvent\t1\tX\t2\tGoals\tOver\tUnder
-26/01/2026\t05:36\tFCA - HDH\t2.51\t3.46\t2.93\t2.5\t2.32\t1.64
-26/01/2026\t06:00\tBMG - RBL\t2.15\t3.25\t3.10\t2.5\t1.95\t1.85`;
+  // New simplified format: Date, Time, Home, Away, Over, Under
+  const sampleData = `Date\tTime\tHome\tAway\tOver\tUnder
+26/01/2026\t05:36\tFCA\tHDH\t2.32\t1.64
+26/01/2026\t06:00\tBMG\tRBL\t1.95\t1.85`;
 
   const loadSample = () => {
     setInput(sampleData);
@@ -75,7 +75,7 @@ export default function OddsInput({ onOddsSubmitted }: OddsInputProps) {
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        placeholder="Paste tab-separated odds here...&#10;&#10;Format:&#10;Date\tTime\tEvent\t1\tX\t2\tGoals\tOver\tUnder&#10;26/01/2026\t05:36\tFCA - HDH\t2.51\t3.46\t2.93\t2.5\t2.32\t1.64"
+        placeholder="Paste tab-separated odds here...&#10;&#10;Format:&#10;Date\tTime\tHome\tAway\tOver\tUnder&#10;26/01/2026\t05:36\tFCA\tHDH\t2.32\t1.64"
         className="w-full h-48 p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
       />
 

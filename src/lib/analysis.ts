@@ -169,9 +169,8 @@ export function validateSportyJson(data: unknown): { valid: boolean; error?: str
   return { valid: true };
 }
 
-// Parse odds from tab-separated string (supports both old and new format)
-// Old format: Time, Event, 1, X, 2, Goals, Over, Under
-// New format: Date, Time, Event, 1, X, 2, Goals, Over, Under
+// Parse odds from tab-separated string
+// New simplified format: Date, Time, Home, Away, Over, Under
 export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOdds[]; error?: string } {
   const lines = input.trim().split('\n');
   
@@ -179,10 +178,6 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
     return { valid: false, error: 'No data rows found. Please include header and at least one data row.' };
   }
 
-  // Detect format by checking header
-  const headerLine = lines[0].toLowerCase();
-  const hasDateColumn = headerLine.includes('date');
-  
   // Skip header row
   const dataLines = lines.slice(1);
   const parsedOdds: ParsedOdds[] = [];
@@ -193,65 +188,20 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
 
     const parts = line.split('\t');
     
-    // Determine column indices based on format
-    let dateCol: string | undefined;
-    let timeCol: string;
-    let eventCol: string;
-    let homeOddIdx: number;
-    let drawOddIdx: number;
-    let awayOddIdx: number;
-    let goalLineIdx: number;
-    let overOddIdx: number;
-    let underOddIdx: number;
-    
-    if (hasDateColumn) {
-      // New format: Date, Time, Event, 1, X, 2, Goals, Over, Under
-      if (parts.length < 9) {
-        return { valid: false, error: `Line ${i + 2}: Expected 9 columns with date, got ${parts.length}. Format: Date, Time, Event, 1, X, 2, Goals, Over, Under` };
-      }
-      dateCol = parts[0].trim();
-      timeCol = parts[1].trim();
-      eventCol = parts[2].trim();
-      homeOddIdx = 3;
-      drawOddIdx = 4;
-      awayOddIdx = 5;
-      goalLineIdx = 6;
-      overOddIdx = 7;
-      underOddIdx = 8;
-    } else {
-      // Old format: Time, Event, 1, X, 2, Goals, Over, Under
-      if (parts.length < 8) {
-        return { valid: false, error: `Line ${i + 2}: Expected at least 8 columns, got ${parts.length}. Format: Time, Event, 1, X, 2, Goals, Over, Under` };
-      }
-      timeCol = parts[0].trim();
-      eventCol = parts[1].trim();
-      homeOddIdx = 2;
-      drawOddIdx = 3;
-      awayOddIdx = 4;
-      goalLineIdx = 5;
-      overOddIdx = 6;
-      underOddIdx = 7;
+    // New format: Date, Time, Home, Away, Over, Under (6 columns)
+    if (parts.length < 6) {
+      return { valid: false, error: `Line ${i + 2}: Expected 6 columns, got ${parts.length}. Format: Date, Time, Home, Away, Over, Under` };
     }
     
-    // Parse event "FCA - HDH" to get teams
-    const teamParts = eventCol.split(' - ');
-    if (teamParts.length !== 2) {
-      return { valid: false, error: `Line ${i + 2}: Invalid event format. Expected "HomeTeam - AwayTeam"` };
-    }
+    const dateCol = parts[0].trim();
+    const timeCol = parts[1].trim();
+    const homeTeam = parts[2].trim();
+    const awayTeam = parts[3].trim();
+    const overOdd = parseFloat(parts[4]);
+    const underOdd = parseFloat(parts[5]);
 
-    const homeTeam = teamParts[0].trim();
-    const awayTeam = teamParts[1].trim();
-
-    const homeOdd = parseFloat(parts[homeOddIdx]);
-    const drawOdd = parseFloat(parts[drawOddIdx]);
-    const awayOdd = parseFloat(parts[awayOddIdx]);
-    const goalLine = parseFloat(parts[goalLineIdx]);
-    const overOdd = parseFloat(parts[overOddIdx]);
-    const underOdd = parseFloat(parts[underOddIdx]);
-
-    if (isNaN(homeOdd) || isNaN(drawOdd) || isNaN(awayOdd) ||
-        isNaN(goalLine) || isNaN(overOdd) || isNaN(underOdd)) {
-      return { valid: false, error: `Line ${i + 2}: Invalid numeric values` };
+    if (isNaN(overOdd) || isNaN(underOdd)) {
+      return { valid: false, error: `Line ${i + 2}: Invalid numeric values for Over/Under odds` };
     }
 
     if (!timeCol || !homeTeam || !awayTeam) {
@@ -274,10 +224,6 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
       block_time: timeCol,
       home_team: homeTeam,
       away_team: awayTeam,
-      home_odd: homeOdd,
-      draw_odd: drawOdd,
-      away_odd: awayOdd,
-      goal_line: goalLine,
       over_odd: overOdd,
       under_odd: underOdd,
       match_date: matchDate,
