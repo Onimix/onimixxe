@@ -172,3 +172,131 @@ export interface Match {
   awayTeamName: string;
   matchStatus: string;
 }
+
+// ============================================
+// OVER 2.5 TRACKING SYSTEM TYPES
+// ============================================
+
+// Bucket configuration for odds ranges
+export interface BucketConfig {
+  homeOddBuckets: Array<{ min: number; max: number; label: string }>;
+  over25OddBuckets: Array<{ min: number; max: number; label: string }>;
+}
+
+// Default bucket configuration
+export const DEFAULT_BUCKET_CONFIG: BucketConfig = {
+  homeOddBuckets: [
+    { min: 1.20, max: 1.40, label: '1.20-1.40' },
+    { min: 1.41, max: 1.70, label: '1.41-1.70' },
+    { min: 1.71, max: 2.20, label: '1.71-2.20' },
+    { min: 2.21, max: 999, label: '2.21+' },
+  ],
+  over25OddBuckets: [
+    { min: 1.40, max: 1.60, label: '1.40-1.60' },
+    { min: 1.61, max: 1.80, label: '1.61-1.80' },
+    { min: 1.81, max: 999, label: '1.81+' },
+  ],
+};
+
+// Extended Result type for Over 2.5 tracking
+export interface Over25Result {
+  id: string;
+  match_date: string;
+  block_id?: string;
+  platform?: string;
+  home_team: string;
+  away_team: string;
+  home_goals: number;
+  away_goals: number;
+  total_goals: number;
+  home_odd?: number;
+  away_odd?: number;
+  over25_odd?: number;
+  under25_odd?: number;
+  result_over25: boolean;
+  result_home_win: boolean;
+  created_at: string;
+}
+
+// Upcoming match input for Over 2.5 analysis
+export interface UpcomingMatchInput {
+  home_odd: number;
+  away_odd: number;
+  over25_odd: number;
+  under25_odd: number;
+  home_team?: string;
+  away_team?: string;
+  block_id?: string;
+  match_date?: string;
+}
+
+// Upcoming match record from database
+export interface UpcomingMatch extends UpcomingMatchInput {
+  id: string;
+  match_date: string;
+  bucket_home?: string;
+  bucket_over25?: string;
+  historical_over25_rate?: number;
+  total_in_bucket?: number;
+  current_streak?: number;
+  streak_type?: string;
+  confidence_indicator?: string;
+  created_at: string;
+}
+
+// Bucket statistics
+export interface BucketStats {
+  id: string;
+  bucket_type: 'home_odd' | 'away_odd' | 'over25_odd';
+  bucket_range: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+  current_streak: number;
+  streak_type: 'over' | 'under' | 'none';
+  last_updated: string;
+}
+
+// Odds pattern tracking
+export interface OddsPattern {
+  id: string;
+  pattern_hash: string;
+  home_odd_range: string;
+  over25_odd_range: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+  last_seen: string;
+  created_at: string;
+}
+
+// Over 2.5 analysis result
+export interface Over25Analysis {
+  bucket_home: string;
+  bucket_over25: string;
+  historical_over25_rate: number;
+  total_in_bucket: number;
+  current_streak: number;
+  streak_type: 'over' | 'under' | 'none';
+  confidence_indicator: 'HIGH' | 'MEDIUM' | 'LOW';
+  recommendation?: string;
+}
+
+// Bucket performance for display
+export interface BucketPerformance {
+  bucket_range: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+  current_streak: number;
+  streak_type: string;
+}
+
+// Day/Block performance summary
+export interface DayBlockPerformance {
+  date: string;
+  block_id?: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+}

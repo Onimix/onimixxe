@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Result, Odds, PredictionRecord, PerformanceMetrics, ProbabilityBands } from './types';
+import type { Result, Odds, PredictionRecord, PerformanceMetrics, ProbabilityBands, Over25Result, UpcomingMatch, BucketStats, OddsPattern } from './types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 // Support both anon key and publishable key variable names
@@ -648,5 +648,367 @@ export async function linkResultsToPredictions(): Promise<{
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error linking results to predictions:', errorMessage);
     return { success: false, updated: 0, error: errorMessage };
+  }
+}
+
+// =====================================================
+// OVER 2.5 TRACKING OPERATIONS
+// =====================================================
+
+/**
+ * Get all results with Over 2.5 tracking data
+ */
+export async function getOver25Results(): Promise<Over25Result[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const allResults: Over25Result[] = [];
+    let page = 0;
+    const pageSize = 1000;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('results')
+        .select('*')
+        .not('match_date', 'is', null)
+        .order('match_date', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching Over 2.5 results:', error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allResults.push(...data);
+
+      if (data.length < pageSize) {
+        break;
+      }
+
+      page++;
+    }
+
+    return allResults;
+  } catch (error) {
+    console.error('Error fetching Over 2.5 results:', error);
+    return [];
+  }
+}
+
+/**
+ * Get results filtered by date range
+ */
+export async function getOver25ResultsByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<Over25Result[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('*')
+      .gte('match_date', startDate)
+      .lte('match_date', endDate)
+      .order('match_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching Over 2.5 results by date:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching Over 2.5 results by date:', error);
+    return [];
+  }
+}
+
+/**
+ * Get results filtered by block ID
+ */
+export async function getOver25ResultsByBlock(blockId: string): Promise<Over25Result[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('results')
+      .select('*')
+      .eq('block_id', blockId)
+      .order('match_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching Over 2.5 results by block:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching Over 2.5 results by block:', error);
+    return [];
+  }
+}
+
+/**
+ * Insert upcoming match for Over 2.5 analysis
+ */
+export async function insertUpcomingMatch(match: {
+  match_date?: string;
+  block_id?: string;
+  home_team?: string;
+  away_team?: string;
+  home_odd: number;
+  away_odd: number;
+  over25_odd: number;
+  under25_odd: number;
+  bucket_home?: string;
+  bucket_over25?: string;
+  historical_over25_rate?: number;
+  total_in_bucket?: number;
+  current_streak?: number;
+  streak_type?: string;
+  confidence_indicator?: string;
+}): Promise<{ success: boolean; error?: string; data?: UpcomingMatch }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('upcoming_matches')
+      .insert(match)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting upcoming match:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error inserting upcoming match:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get all upcoming matches
+ */
+export async function getUpcomingMatches(): Promise<UpcomingMatch[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('upcoming_matches')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching upcoming matches:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching upcoming matches:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear upcoming matches
+ */
+export async function clearUpcomingMatches(): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('upcoming_matches')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      console.error('Error clearing upcoming matches:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error clearing upcoming matches:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Update result with odds data
+ */
+export async function updateResultWithOdds(
+  resultId: string,
+  oddsData: {
+    home_odd?: number;
+    away_odd?: number;
+    over25_odd?: number;
+    under25_odd?: number;
+    block_id?: string;
+    platform?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('results')
+      .update(oddsData)
+      .eq('id', resultId);
+
+    if (error) {
+      console.error('Error updating result with odds:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error updating result with odds:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get bucket statistics
+ */
+export async function getBucketStats(): Promise<BucketStats[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('bucket_stats')
+      .select('*')
+      .order('bucket_type', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching bucket stats:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching bucket stats:', error);
+    return [];
+  }
+}
+
+/**
+ * Upsert bucket statistics
+ */
+export async function upsertBucketStats(stats: {
+  bucket_type: 'home_odd' | 'away_odd' | 'over25_odd';
+  bucket_range: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+  current_streak: number;
+  streak_type: 'over' | 'under' | 'none';
+}): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('bucket_stats')
+      .upsert(stats, { onConflict: 'bucket_type,bucket_range' });
+
+    if (error) {
+      console.error('Error upserting bucket stats:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error upserting bucket stats:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get odds patterns
+ */
+export async function getOddsPatterns(): Promise<OddsPattern[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('odds_patterns')
+      .select('*')
+      .order('total_matches', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching odds patterns:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching odds patterns:', error);
+    return [];
+  }
+}
+
+/**
+ * Upsert odds pattern
+ */
+export async function upsertOddsPattern(pattern: {
+  pattern_hash: string;
+  home_odd_range: string;
+  over25_odd_range: string;
+  total_matches: number;
+  over25_hits: number;
+  over25_rate: number;
+  last_seen: string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('odds_patterns')
+      .upsert(pattern, { onConflict: 'pattern_hash' });
+
+    if (error) {
+      console.error('Error upserting odds pattern:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error upserting odds pattern:', errorMessage);
+    return { success: false, error: errorMessage };
   }
 }

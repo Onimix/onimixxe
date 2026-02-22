@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import JsonUploader from '@/components/JsonUploader';
 import OddsInput from '@/components/OddsInput';
 import HistoricalStatsPanel from '@/components/HistoricalStats';
@@ -250,6 +251,12 @@ export default function Home() {
           <p className="text-slate-400 text-lg">
             AI-Powered Over 1.5 Goals Prediction Engine
           </p>
+          <Link 
+            href="/over25-structure"
+            className="inline-block mt-4 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold py-2 px-6 rounded-full transition-all transform hover:scale-105"
+          >
+            🎯 Over 2.5 Structure Analysis →
+          </Link>
         </div>
 
         {/* Collapsible Data Upload Panel */}
