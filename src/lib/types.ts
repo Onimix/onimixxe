@@ -289,6 +289,9 @@ export interface Over25Analysis {
   streak_type: 'over' | 'under' | 'none';
   confidence_indicator: 'HIGH' | 'MEDIUM' | 'LOW';
   recommendation?: string;
+  // Internal tracking fields (optional)
+  _fallback_used?: 'exact_pattern' | 'home_bucket' | 'over25_bucket' | 'overall';
+  _exact_match_count?: number;
 }
 
 // Bucket performance for display

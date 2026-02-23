@@ -331,72 +331,112 @@ export default function Over25OddsInput({ results, onOddsSubmitted }: Over25Odds
                   </div>
                 </div>
 
-                {/* Full Predictions Table */}
-                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                  <h3 className="text-lg font-bold text-white mb-4">🎯 All Predictions (Sorted)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-slate-400 border-b border-slate-600">
-                          <th className="text-left py-2 px-2">Date/Time</th>
-                          <th className="text-left py-2 px-2">Match</th>
-                          <th className="text-center py-2 px-2">Odds</th>
-                          <th className="text-center py-2 px-2">Bucket</th>
-                          <th className="text-center py-2 px-2">Hist. Rate</th>
-                          <th className="text-center py-2 px-2">Confidence</th>
-                          <th className="text-center py-2 px-2">Recommendation</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedPredictions.map((pred, i) => (
-                          <tr key={i} className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${
-                            i === 0 && pred.confidence_indicator !== 'LOW' ? 'bg-green-900/20' : ''
+                {/* Full Predictions Cards */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-bold text-white">🎯 All Predictions</h3>
+                  {sortedPredictions.map((pred, i) => (
+                    <div 
+                      key={i} 
+                      className={`bg-slate-800/50 rounded-xl border p-4 ${
+                        i === 0 && pred.confidence_indicator !== 'LOW' 
+                          ? 'border-green-500/50 bg-green-900/10' 
+                          : 'border-slate-700'
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {i === 0 && pred.confidence_indicator !== 'LOW' && (
+                            <span className="text-2xl">🔥</span>
+                          )}
+                          <div>
+                            <div className="text-white font-semibold">
+                              {pred.home_team} vs {pred.away_team}
+                            </div>
+                            <div className="text-slate-400 text-sm">
+                              {pred.match_date || '-'} | {pred.match_time || '-'}
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                          pred.confidence_indicator === 'HIGH' ? 'bg-green-500/20 text-green-400 border border-green-500' :
+                          pred.confidence_indicator === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500' : 
+                          'bg-red-500/20 text-red-400 border border-red-500'
+                        }`}>
+                          {pred.confidence_indicator || 'LOW'}
+                        </span>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div className="bg-slate-700/50 rounded-lg p-3">
+                          <div className="text-slate-400 text-xs uppercase">Odds</div>
+                          <div className="text-white font-medium">
+                            H: {pred.home_odd?.toFixed(2)} | A: {pred.away_odd?.toFixed(2)}
+                          </div>
+                          <div className="text-purple-400 font-bold">
+                            O2.5: {pred.over25_odd?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3">
+                          <div className="text-slate-400 text-xs uppercase">Buckets</div>
+                          <div className="text-white text-sm">Home: {pred.bucket_home}</div>
+                          <div className="text-purple-400 text-sm">O2.5: {pred.bucket_over25}</div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3">
+                          <div className="text-slate-400 text-xs uppercase">Historical Rate</div>
+                          <div className={`text-xl font-bold ${
+                            (pred.historical_over25_rate || 0) >= 60 ? 'text-green-400' : 
+                            (pred.historical_over25_rate || 0) >= 50 ? 'text-yellow-400' : 'text-red-400'
                           }`}>
-                            <td className="py-3 px-2 text-white">
-                              <div>{pred.match_date || '-'}</div>
-                              <div className="text-slate-400 text-xs">{pred.match_time || '-'}</div>
-                            </td>
-                            <td className="py-3 px-2 text-white">
-                              <div className="font-medium">
-                                {i === 0 && pred.confidence_indicator !== 'LOW' && <span className="text-yellow-400 mr-1">🔥</span>}
-                                {pred.home_team} vs {pred.away_team}
-                              </div>
-                            </td>
-                            <td className="py-3 px-2 text-center">
-                              <div className="text-slate-300 text-xs">
-                                H: {pred.home_odd?.toFixed(2)} | A: {pred.away_odd?.toFixed(2)}
-                              </div>
-                              <div className="text-purple-400 font-medium">
-                                O2.5: {pred.over25_odd?.toFixed(2)}
-                              </div>
-                            </td>
-                            <td className="py-3 px-2 text-center text-slate-300">
-                              <div className="text-xs">{pred.bucket_home}</div>
-                              <div className="text-xs text-purple-400">{pred.bucket_over25}</div>
-                            </td>
-                            <td className="py-3 px-2 text-center">
-                              <span className={`font-bold ${(pred.historical_over25_rate || 0) >= 60 ? 'text-green-400' : 'text-yellow-400'}`}>
-                                {pred.historical_over25_rate?.toFixed(1) || '0'}%
-                              </span>
-                              <div className="text-slate-400 text-xs">({pred.total_in_bucket || 0} matches)</div>
-                            </td>
-                            <td className="py-3 px-2 text-center">
-                              <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                pred.confidence_indicator === 'HIGH' ? 'bg-green-500/20 text-green-400' :
-                                pred.confidence_indicator === 'MEDIUM' ? 'bg-yellow-500/20 text-yellow-400' : 
-                                'bg-red-500/20 text-red-400'
-                              }`}>
-                                {pred.confidence_indicator || 'LOW'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-2 text-center text-slate-300 text-xs">
-                              {pred.recommendation || '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            {pred.historical_over25_rate?.toFixed(1) || '0'}%
+                          </div>
+                          <div className="text-slate-400 text-xs">
+                            ({pred.total_in_bucket || 0} matches)
+                          </div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3">
+                          <div className="text-slate-400 text-xs uppercase">Streak</div>
+                          <div className={`text-xl font-bold ${
+                            pred.streak_type === 'over' ? 'text-green-400' : 
+                            pred.streak_type === 'under' ? 'text-red-400' : 'text-slate-400'
+                          }`}>
+                            {pred.current_streak || 0} {pred.streak_type || '-'}
+                          </div>
+                          <div className="text-slate-400 text-xs">
+                            {pred.recommendation || '-'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Confidence Bar */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-slate-400">Confidence</span>
+                            <span className="font-bold text-white">
+                              {pred.historical_over25_rate?.toFixed(1) || 0}%
+                            </span>
+                          </div>
+                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                (pred.historical_over25_rate || 0) >= 65
+                                  ? 'bg-green-500'
+                                  : (pred.historical_over25_rate || 0) >= 50
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                              }`}
+                              style={{ width: `${Math.min(100, pred.historical_over25_rate || 0)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="text-right text-sm text-slate-400">
+                          Odd: {pred.over25_odd?.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             );

@@ -182,7 +182,7 @@ export function analyzeUpcomingMatch(
   const over25Bucket = getOver25OddBucket(input.over25_odd, config);
   const patternHash = createPatternHash(homeBucket, over25Bucket);
 
-  // Find matching pattern in historical data
+  // Find matching pattern in historical data (exact bucket match)
   const matchingResults = historicalResults.filter(result => {
     if (!result.home_odd || !result.over25_odd) return false;
     const resultHomeBucket = getHomeOddBucket(result.home_odd, config);
@@ -190,18 +190,91 @@ export function analyzeUpcomingMatch(
     return resultHomeBucket === homeBucket && resultOver25Bucket === over25Bucket;
   });
 
-  // Calculate statistics
+  // Calculate statistics from exact pattern match
   const totalInBucket = matchingResults.length;
   const over25Hits = matchingResults.filter(r => r.result_over25).length;
-  const historicalOver25Rate = totalInBucket > 0 ? (over25Hits / totalInBucket) * 100 : 0;
+  let historicalOver25Rate = totalInBucket > 0 ? (over25Hits / totalInBucket) * 100 : 0;
 
-  // Calculate current streak
-  const sortedResults = matchingResults.sort((a, b) => 
-    new Date(b.match_date).getTime() - new Date(a.match_date).getTime()
-  );
+  // FALLBACK 1: If no exact pattern match, try using home odd bucket alone
+  let homeBucketOnlyRate = 0;
+  let homeBucketCount = 0;
+  if (totalInBucket === 0) {
+    const homeBucketResults = historicalResults.filter(result => {
+      if (!result.home_odd) return false;
+      const resultHomeBucket = getHomeOddBucket(result.home_odd, config);
+      return resultHomeBucket === homeBucket;
+    });
+    homeBucketCount = homeBucketResults.length;
+    const homeBucketHits = homeBucketResults.filter(r => r.result_over25).length;
+    homeBucketOnlyRate = homeBucketCount > 0 ? (homeBucketHits / homeBucketCount) * 100 : 0;
+  }
 
+  // FALLBACK 2: If still no data, try using over 2.5 odd bucket alone
+  let over25BucketOnlyRate = 0;
+  let over25BucketCount = 0;
+  if (totalInBucket === 0 && homeBucketCount === 0) {
+    const over25BucketResults = historicalResults.filter(result => {
+      if (!result.over25_odd) return false;
+      const resultOver25Bucket = getOver25OddBucket(result.over25_odd, config);
+      return resultOver25Bucket === over25Bucket;
+    });
+    over25BucketCount = over25BucketResults.length;
+    const over25BucketHits = over25BucketResults.filter(r => r.result_over25).length;
+    over25BucketOnlyRate = over25BucketCount > 0 ? (over25BucketHits / over25BucketCount) * 100 : 0;
+  }
+
+  // FALLBACK 3: Use overall historical rate as last resort
+  const overallStats = getOverallOver25Stats(historicalResults);
+  const overallRate = overallStats.over25Rate;
+
+  // Use the best available data source
+  let usedFallback: 'exact_pattern' | 'home_bucket' | 'over25_bucket' | 'overall' = 'exact_pattern';
+  let finalRate = historicalOver25Rate;
+  let sampleSize = totalInBucket;
+
+  if (totalInBucket === 0) {
+    if (homeBucketCount > 0) {
+      finalRate = homeBucketOnlyRate;
+      sampleSize = homeBucketCount;
+      usedFallback = 'home_bucket';
+    } else if (over25BucketCount > 0) {
+      finalRate = over25BucketOnlyRate;
+      sampleSize = over25BucketCount;
+      usedFallback = 'over25_bucket';
+    } else {
+      // Use overall rate as last resort
+      finalRate = overallRate;
+      sampleSize = historicalResults.length;
+      usedFallback = 'overall';
+    }
+  }
+
+  // Calculate current streak from the data source we're using
   let currentStreak = 0;
   let streakType: 'over' | 'under' | 'none' = 'none';
+
+  let dataForStreak: Over25Result[] = [];
+  if (usedFallback === 'exact_pattern') {
+    dataForStreak = matchingResults;
+  } else if (usedFallback === 'home_bucket') {
+    dataForStreak = historicalResults.filter(result => {
+      if (!result.home_odd) return false;
+      const resultHomeBucket = getHomeOddBucket(result.home_odd, config);
+      return resultHomeBucket === homeBucket;
+    });
+  } else if (usedFallback === 'over25_bucket') {
+    dataForStreak = historicalResults.filter(result => {
+      if (!result.over25_odd) return false;
+      const resultOver25Bucket = getOver25OddBucket(result.over25_odd, config);
+      return resultOver25Bucket === over25Bucket;
+    });
+  } else {
+    dataForStreak = historicalResults;
+  }
+
+  const sortedResults = dataForStreak.sort((a, b) => 
+    new Date(b.match_date).getTime() - new Date(a.match_date).getTime()
+  );
 
   if (sortedResults.length > 0) {
     const firstResult = sortedResults[0];
@@ -217,41 +290,72 @@ export function analyzeUpcomingMatch(
     }
   }
 
-  // Determine confidence indicator
+  // Determine confidence indicator based on sample size and rate
   let confidenceIndicator: 'HIGH' | 'MEDIUM' | 'LOW';
   let recommendation: string | undefined;
 
-  if (totalInBucket >= 20) {
-    if (historicalOver25Rate >= 70) {
+  // Use sample size thresholds adjusted for fallback data
+  const minSampleForHigh = usedFallback === 'exact_pattern' ? 20 : 50;
+  const minSampleForMedium = usedFallback === 'exact_pattern' ? 10 : 25;
+
+  if (sampleSize >= minSampleForHigh) {
+    if (finalRate >= 70) {
       confidenceIndicator = 'HIGH';
-      recommendation = 'Strong Over 2.5 pattern detected';
-    } else if (historicalOver25Rate >= 55) {
+      recommendation = 'Strong Over 2.5 pattern';
+    } else if (finalRate >= 55) {
       confidenceIndicator = 'MEDIUM';
       recommendation = 'Moderate Over 2.5 tendency';
-    } else if (historicalOver25Rate <= 40) {
+    } else if (finalRate <= 40) {
       confidenceIndicator = 'HIGH';
-      recommendation = 'Strong Under 2.5 pattern detected';
+      recommendation = 'Strong Under 2.5 pattern';
     } else {
       confidenceIndicator = 'MEDIUM';
-      recommendation = 'Mixed results, proceed with caution';
+      recommendation = 'Mixed results, moderate confidence';
     }
-  } else if (totalInBucket >= 10) {
+  } else if (sampleSize >= minSampleForMedium) {
     confidenceIndicator = 'MEDIUM';
-    recommendation = 'Limited data, moderate confidence';
+    if (finalRate >= 60) {
+      recommendation = 'Likely Over 2.5';
+    } else if (finalRate <= 45) {
+      recommendation = 'Likely Under 2.5';
+    } else {
+      recommendation = 'Limited data, moderate confidence';
+    }
   } else {
-    confidenceIndicator = 'LOW';
-    recommendation = 'Insufficient historical data';
+    // Not enough data - use overall rate as baseline but mark as LOW
+    if (historicalResults.length > 0) {
+      // Use overall rate with LOW confidence
+      finalRate = overallRate;
+      sampleSize = historicalResults.length;
+      
+      if (finalRate >= 65) {
+        confidenceIndicator = 'MEDIUM'; // Upgraded from LOW because we have overall data
+        recommendation = `Historical O2.5 rate: ${finalRate.toFixed(1)}%`;
+      } else if (finalRate >= 50) {
+        confidenceIndicator = 'LOW';
+        recommendation = `Historical O2.5 rate: ${finalRate.toFixed(1)}%`;
+      } else {
+        confidenceIndicator = 'MEDIUM';
+        recommendation = `Historical O2.5 rate: ${finalRate.toFixed(1)}%`;
+      }
+    } else {
+      confidenceIndicator = 'LOW';
+      recommendation = 'No historical data available';
+    }
   }
 
   return {
     bucket_home: homeBucket,
     bucket_over25: over25Bucket,
-    historical_over25_rate: Math.round(historicalOver25Rate * 10) / 10,
-    total_in_bucket: totalInBucket,
+    historical_over25_rate: Math.round(finalRate * 10) / 10,
+    total_in_bucket: sampleSize,
     current_streak: currentStreak,
     streak_type: streakType,
     confidence_indicator: confidenceIndicator,
     recommendation,
+    // Additional info for display
+    _fallback_used: usedFallback,
+    _exact_match_count: totalInBucket,
   };
 }
 
