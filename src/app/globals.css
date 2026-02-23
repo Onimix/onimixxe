@@ -35,3 +35,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Slow pulse animation for TOP PICK highlights */
+@keyframes pulse-slow {
+  0%, 100% { 
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(255, 165, 0, 0.5);
+  }
+  50% { 
+    opacity: 0.9;
+    box-shadow: 0 0 40px rgba(255, 165, 0, 0.8);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
