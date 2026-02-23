@@ -98,6 +98,36 @@ export default function Home() {
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [isDataInputUnlocked, setIsDataInputUnlocked] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+
+  const handleDataInputClick = () => {
+    if (isDataInputUnlocked) {
+      setIsInputExpanded(!isInputExpanded);
+    } else {
+      setShowPasswordModal(true);
+      setPasswordError(false);
+      setPasswordInput('');
+    }
+  };
+
+  const handlePasswordSubmit = () => {
+    if (passwordInput === 'ONIMIX') {
+      setIsDataInputUnlocked(true);
+      setIsInputExpanded(true);
+      setShowPasswordModal(false);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
+  const handleLockDataInput = () => {
+    setIsDataInputUnlocked(false);
+    setIsInputExpanded(false);
+  };
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -262,17 +292,34 @@ export default function Home() {
         {/* Collapsible Data Upload Panel */}
         <section className="mb-10">
           <button
-            onClick={() => setIsInputExpanded(!isInputExpanded)}
+            onClick={handleDataInputClick}
             className="w-full bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-slate-700 hover:border-slate-600 transition-all duration-300 flex items-center justify-between group"
           >
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               📊 Data Input Panel
-              <span className="text-sm font-normal text-slate-400 group-hover:text-slate-300 transition-colors">
-                (Click to {isInputExpanded ? 'collapse' : 'expand'})
-              </span>
+              {isDataInputUnlocked ? (
+                <span className="text-sm font-normal text-green-400">
+                  (Unlocked - Click to {isInputExpanded ? 'collapse' : 'expand'})
+                </span>
+              ) : (
+                <span className="text-sm font-normal text-slate-400 group-hover:text-slate-300 transition-colors">
+                  (Click to expand)
+                </span>
+              )}
             </h2>
-            <div className={`text-3xl transform transition-transform duration-300 ${isInputExpanded ? 'rotate-180' : ''}`}>
-              ⬇️
+            <div className="flex items-center gap-3">
+              {isDataInputUnlocked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleLockDataInput(); }}
+                  className="text-xl hover:scale-110 transition-transform"
+                  title="Lock Data Input"
+                >
+                  🔒
+                </button>
+              )}
+              <div className={`text-3xl transform transition-transform duration-300 ${isInputExpanded ? 'rotate-180' : ''}`}>
+                ⬇️
+              </div>
             </div>
           </button>
           
@@ -453,6 +500,59 @@ export default function Home() {
           </a>
         </div>
       </footer>
+
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-md w-full border border-slate-700 shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-4">🔐</div>
+              <h3 className="text-2xl font-bold text-white">Data Input Locked</h3>
+              <p className="text-slate-400 mt-2">Enter password to access data input panel</p>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError(false);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                  placeholder="Enter password..."
+                  className={`w-full px-4 py-3 bg-slate-700 border rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
+                    passwordError ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:border-green-500'
+                  }`}
+                  autoFocus
+                />
+                {passwordError && (
+                  <p className="text-red-400 text-sm mt-2">❌ Incorrect password. Please try again.</p>
+                )}
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePasswordSubmit}
+                  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-colors"
+                >
+                  Unlock 🔓
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         /* 💚 MATRIX RAIN ANIMATIONS - TINY FALLING CODE 💚 */
