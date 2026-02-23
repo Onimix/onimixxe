@@ -28,6 +28,7 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 - [x] **Team name validation** - reject numeric-only team names (2026-02-23)
 - [x] **TOP PICK highlights** - Both dashboards now highlight the best match to bet on (2026-02-23)
 - [x] **Predictions sorted by confidence** - SAFE/HIGH first, then MODERATE/MEDIUM (2026-02-23)
+- [x] **Calibration now affects SAFE/MODERATE decision** - Uses calibrated probability in decision criteria (2026-02-23)
 
 ## Current Structure
 
@@ -136,3 +137,4 @@ Date	Time	Match and Result
 | 2026-02-22 | Added independent Over 2.5 tracking system with bucket analysis |
 | 2026-02-22 | Added bulk odds input for Over 2.5 with instant predictions output |
 | 2026-02-23 | Added team name validation to reject numeric-only team names |
+| 2026-02-23 | Fixed SAFE prediction bug: KOE vs TSG 0:0 was SAFE due to 82.2% raw but 73.1% calibrated - now uses calibrated probability for decision criteria |
