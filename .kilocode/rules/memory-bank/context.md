@@ -25,6 +25,7 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 - [x] **"Buy Me A Coffee" button in footer**
 - [x] **"Onimix is cooking" animated footer**
 - [x] **Results cleanup migration SQL**
+- [x] **Team name validation** - reject numeric-only team names (2026-02-23)
 
 ## Current Structure
 
@@ -132,3 +133,4 @@ Date	Time	Match and Result
 | 2026-02-21 | Created results cleanup migration SQL to delete results without dates |
 | 2026-02-22 | Added independent Over 2.5 tracking system with bucket analysis |
 | 2026-02-22 | Added bulk odds input for Over 2.5 with instant predictions output |
+| 2026-02-23 | Added team name validation to reject numeric-only team names |
