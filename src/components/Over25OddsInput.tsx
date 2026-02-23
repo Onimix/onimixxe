@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { analyzeUpcomingMatch } from '@/lib/over25-analysis';
 import type { Over25Result, Over25Analysis, ParsedOver25Odds } from '@/lib/types';
 
+// Check if a team name is valid (must contain at least one letter)
+function isValidTeamName(name: string): boolean {
+  return /[a-zA-Z]/.test(name);
+}
+
 interface Over25OddsInputProps {
   results: Over25Result[];
   onOddsSubmitted: (predictions: Over25Analysis[]) => void;
@@ -47,6 +52,14 @@ function parseOver25OddsInput(input: string): { valid: boolean; data?: ParsedOve
 
     if (!homeTeam || !awayTeam) {
       return { valid: false, error: `Line ${i + 2}: Missing team names` };
+    }
+
+    // Validate team names - must contain at least one letter
+    if (!isValidTeamName(homeTeam)) {
+      return { valid: false, error: `Line ${i + 2}: Invalid home team name "${homeTeam}" - team names must contain letters` };
+    }
+    if (!isValidTeamName(awayTeam)) {
+      return { valid: false, error: `Line ${i + 2}: Invalid away team name "${awayTeam}" - team names must contain letters` };
     }
 
     // Parse date to ISO format (DD/MM/YYYY -> YYYY-MM-DD)

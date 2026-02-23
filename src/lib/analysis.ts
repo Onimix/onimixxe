@@ -1,5 +1,11 @@
 import type { Result, ParsedOdds, Prediction, HistoricalStats, TeamStats, ParsedResult } from './types';
 
+// Check if a team name is valid (must contain at least one letter)
+export function isValidTeamName(name: string): boolean {
+  // Team name must contain at least one letter (a-z or A-Z)
+  return /[a-zA-Z]/.test(name);
+}
+
 // Convert timestamp to block time (HH:MM format)
 export function timestampToBlockTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -208,6 +214,14 @@ export function parseOddsInput(input: string): { valid: boolean; data?: ParsedOd
       return { valid: false, error: `Line ${i + 2}: Missing required fields` };
     }
 
+    // Validate team names - must contain at least one letter
+    if (!isValidTeamName(homeTeam)) {
+      return { valid: false, error: `Line ${i + 2}: Invalid home team name "${homeTeam}" - team names must contain letters` };
+    }
+    if (!isValidTeamName(awayTeam)) {
+      return { valid: false, error: `Line ${i + 2}: Invalid away team name "${awayTeam}" - team names must contain letters` };
+    }
+
     // Parse date to ISO format (DD/MM/YYYY -> YYYY-MM-DD)
     let matchDate: string | undefined;
     if (dateCol) {
@@ -302,6 +316,14 @@ export function parseResultsInput(input: string): { valid: boolean; data?: Parse
 
     if (!timeCol || !homeTeam || !awayTeam) {
       return { valid: false, error: `Line ${i + 1}: Missing required fields` };
+    }
+
+    // Validate team names - must contain at least one letter
+    if (!isValidTeamName(homeTeam)) {
+      return { valid: false, error: `Line ${i + 1}: Invalid home team name "${homeTeam}" - team names must contain letters` };
+    }
+    if (!isValidTeamName(awayTeam)) {
+      return { valid: false, error: `Line ${i + 1}: Invalid away team name "${awayTeam}" - team names must contain letters` };
     }
 
     const totalGoals = homeGoals + awayGoals;
