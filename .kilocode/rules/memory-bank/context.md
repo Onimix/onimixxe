@@ -26,6 +26,8 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 - [x] **"Onimix is cooking" animated footer**
 - [x] **Results cleanup migration SQL**
 - [x] **Team name validation** - reject numeric-only team names (2026-02-23)
+- [x] **TOP PICK highlights** - Both dashboards now highlight the best match to bet on (2026-02-23)
+- [x] **Predictions sorted by confidence** - SAFE/HIGH first, then MODERATE/MEDIUM (2026-02-23)
 
 ## Current Structure
 
