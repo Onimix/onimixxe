@@ -1,4 +1,5 @@
 import type { Result, ParsedOdds, Prediction, HistoricalStats, TeamStats, ParsedResult } from './types';
+import { analyzePatterns, type PatternAnalysis } from './pattern-detection';
 
 // Check if a team name is valid (must contain at least one letter)
 export function isValidTeamName(name: string): boolean {
@@ -82,11 +83,11 @@ export function calculateBlockTimeStats(results: Result[], blockTime: string): H
   };
 }
 
-// Determine prediction based on analysis
+// Determine prediction based on analysis with pattern detection
 export function analyzeMatch(
   match: ParsedOdds,
   results: Result[]
-): Prediction {
+): Prediction & { patternAnalysis?: PatternAnalysis } {
   // Get historical stats for this block time
   const historicalStats = calculateBlockTimeStats(results, match.block_time);
   
@@ -102,16 +103,24 @@ export function analyzeMatch(
   // Calculate expected goals based on team stats
   const expectedGoals = teamAvgScored + teamAvgConceded;
   
-  // Decision rules - combine block time stats and team performance
+  // Run pattern detection
+  const patternAnalysis = analyzePatterns(results, match.block_time);
+  
+  // Apply pattern-based confidence boost to historical rate
+  const adjustedOver15Rate = Math.max(0, Math.min(100, 
+    historicalStats.over15Rate + patternAnalysis.confidenceBoost
+  ));
+  
+  // Decision rules - use ADJUSTED rate that includes pattern detection
   const isSafe = 
-    historicalStats.over15Rate >= 75 && 
+    adjustedOver15Rate >= 75 && 
     historicalStats.avgGoals >= 2.2 && 
     expectedGoals >= 2.0 &&
     teamAvgOver15Rate >= 65 &&
     historicalStats.totalMatches >= 10;
     
   const isModerate = 
-    historicalStats.over15Rate >= 60 && 
+    adjustedOver15Rate >= 60 && 
     historicalStats.avgGoals >= 1.8 && 
     expectedGoals >= 1.5 &&
     teamAvgOver15Rate >= 55 &&
@@ -123,15 +132,15 @@ export function analyzeMatch(
 
   if (isSafe) {
     prediction = 'OVER 1.5';
-    confidence = Math.min(95, Math.round(historicalStats.over15Rate));
+    confidence = Math.min(95, Math.round(adjustedOver15Rate));
     status = 'SAFE';
   } else if (isModerate) {
     prediction = 'OVER 1.5';
-    confidence = Math.round(historicalStats.over15Rate);
+    confidence = Math.round(adjustedOver15Rate);
     status = 'MODERATE';
   } else {
     prediction = 'LOW CONFIDENCE';
-    confidence = Math.max(0, Math.round(historicalStats.over15Rate));
+    confidence = Math.max(0, Math.round(adjustedOver15Rate));
     status = 'RISKY';
   }
 
@@ -147,6 +156,7 @@ export function analyzeMatch(
     prediction,
     confidence,
     status,
+    patternAnalysis,
   };
 }
 
