@@ -251,6 +251,93 @@ export default function PredictionPanel({ predictions }: PredictionPanelProps) {
                 Odds: {prediction.match.over_odd.toFixed(2)}
               </div>
             </div>
+
+            {/* Pattern Analysis Section */}
+            {prediction.patternAnalysis && (
+              <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🔍</span>
+                  <span className="font-semibold text-purple-800">Pattern Analysis</span>
+                  <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
+                    prediction.patternAnalysis.patternScore > 20 
+                      ? 'bg-green-100 text-green-800' 
+                      : prediction.patternAnalysis.patternScore < -20 
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    Score: {prediction.patternAnalysis.patternScore > 0 ? '+' : ''}{prediction.patternAnalysis.patternScore}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  {/* Streak Info */}
+                  <div className="bg-white/50 rounded p-2">
+                    <div className="text-xs text-gray-500">Current Streak</div>
+                    <div className={`font-bold ${
+                      prediction.patternAnalysis.streakInfo.streakType === 'under' 
+                        ? 'text-green-600' 
+                        : 'text-red-600'
+                    }`}>
+                      {prediction.patternAnalysis.streakInfo.currentStreak} {prediction.patternAnalysis.streakInfo.streakType}
+                    </div>
+                  </div>
+                  
+                  {/* Recent Form */}
+                  <div className="bg-white/50 rounded p-2">
+                    <div className="text-xs text-gray-500">Last 5 Over Rate</div>
+                    <div className={`font-bold ${
+                      prediction.patternAnalysis.recentForm.last5OverRate >= 60 
+                        ? 'text-green-600' 
+                        : prediction.patternAnalysis.recentForm.last5OverRate <= 40
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}>
+                      {prediction.patternAnalysis.recentForm.last5OverRate.toFixed(0)}%
+                    </div>
+                  </div>
+                  
+                  {/* Trend */}
+                  <div className="bg-white/50 rounded p-2">
+                    <div className="text-xs text-gray-500">Trend</div>
+                    <div className={`font-bold ${
+                      prediction.patternAnalysis.recentForm.trend === 'improving' 
+                        ? 'text-green-600' 
+                        : prediction.patternAnalysis.recentForm.trend === 'declining'
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}>
+                      {prediction.patternAnalysis.recentForm.trend === 'improving' ? '📈 Improving' : 
+                       prediction.patternAnalysis.recentForm.trend === 'declining' ? '📉 Declining' : 
+                       '➡️ Stable'}
+                    </div>
+                  </div>
+                  
+                  {/* Block Time Trend */}
+                  <div className="bg-white/50 rounded p-2">
+                    <div className="text-xs text-gray-500">Block Time Trend</div>
+                    <div className={`font-bold ${
+                      prediction.patternAnalysis.blockTimePattern.trend === 'hot' 
+                        ? 'text-green-600' 
+                        : prediction.patternAnalysis.blockTimePattern.trend === 'cold'
+                        ? 'text-blue-600'
+                        : 'text-gray-600'
+                    }`}>
+                      {prediction.patternAnalysis.blockTimePattern.trend === 'hot' ? '🔥 Hot' : 
+                       prediction.patternAnalysis.blockTimePattern.trend === 'cold' ? '❄️ Cold' : 
+                       '😐 Neutral'}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Confidence Boost Indicator */}
+                {prediction.patternAnalysis.confidenceBoost !== 0 && (
+                  <div className={`mt-2 text-sm font-medium ${
+                    prediction.patternAnalysis.confidenceBoost > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    Pattern adjustment: {prediction.patternAnalysis.confidenceBoost > 0 ? '+' : ''}{prediction.patternAnalysis.confidenceBoost}% confidence
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ))}

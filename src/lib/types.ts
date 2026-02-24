@@ -70,6 +70,50 @@ export interface TeamStats {
   over15Rate: number;
 }
 
+// Pattern analysis result (imported from pattern-detection module)
+export interface PatternAnalysis {
+  streakInfo: {
+    currentStreak: number;
+    streakType: 'over' | 'under' | 'none';
+    longestOverStreak: number;
+    longestUnderStreak: number;
+  };
+  recentForm: {
+    last5: boolean[];
+    last5OverRate: number;
+    last10OverRate: number;
+    trend: 'improving' | 'declining' | 'stable';
+  };
+  dayOfWeekStats: Array<{
+    day: string;
+    totalMatches: number;
+    overRate: number;
+    avgGoals: number;
+  }>;
+  bounceBack: {
+    after1Under: number;
+    after2Unders: number;
+    after3Unders: number;
+    after1Over: number;
+    after2Overs: number;
+    after3Overs: number;
+  };
+  blockTimePattern: {
+    blockTime: string;
+    recentOverRate: number;
+    historicalOverRate: number;
+    trend: 'hot' | 'cold' | 'neutral';
+    streakInfo: {
+      currentStreak: number;
+      streakType: 'over' | 'under' | 'none';
+      longestOverStreak: number;
+      longestUnderStreak: number;
+    };
+  };
+  patternScore: number;
+  confidenceBoost: number;
+}
+
 // Prediction with performance tracking
 export interface Prediction {
   id?: string;
@@ -86,6 +130,8 @@ export interface Prediction {
   // Calibration
   calibrated_probability?: number;
   calibration_applied?: boolean;
+  // Pattern analysis
+  patternAnalysis?: PatternAnalysis;
 }
 
 // Database prediction record
