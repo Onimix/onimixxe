@@ -114,7 +114,7 @@ export default function Home() {
   };
 
   const handlePasswordSubmit = () => {
-    if (passwordInput === 'ONIMIX') {
+    if (passwordInput === 'ONIMIXAI') {
       setIsDataInputUnlocked(true);
       setIsInputExpanded(true);
       setShowPasswordModal(false);
