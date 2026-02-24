@@ -29,6 +29,13 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 - [x] **TOP PICK highlights** - Both dashboards now highlight the best match to bet on (2026-02-23)
 - [x] **Predictions sorted by confidence** - SAFE/HIGH first, then MODERATE/MEDIUM (2026-02-23)
 - [x] **Calibration now affects SAFE/MODERATE decision** - Uses calibrated probability in decision criteria (2026-02-23)
+- [x] **Pattern Detection System** (2026-02-24)
+  - Streak detection (consecutive overs/unders)
+  - Recent form analysis (last 5/10 matches)
+  - Day-of-week patterns
+  - Bounce-back probability (after N unders)
+  - Block time trend analysis (hot/cold/neutral)
+  - Pattern score affects confidence (+/- 15%)
 
 ## Current Structure
 
@@ -41,6 +48,7 @@ The ONIMIX Eagle Eye Pick analytics engine is complete with a learning-ready arc
 | `src/lib/supabase.ts` | Supabase client & DB ops | ✅ Ready |
 | `src/lib/types.ts` | TypeScript types | ✅ Ready |
 | `src/lib/analysis.ts` | Analysis engine | ✅ Ready |
+| `src/lib/pattern-detection.ts` | Pattern detection module | ✅ Ready |
 | `src/components/JsonUploader.tsx` | JSON upload | ✅ Ready |
 | `src/components/OddsInput.tsx` | Odds paste input | ✅ Ready |
 | `src/components/HistoricalStats.tsx` | Stats panel | ✅ Ready |
@@ -138,3 +146,4 @@ Date	Time	Match and Result
 | 2026-02-22 | Added bulk odds input for Over 2.5 with instant predictions output |
 | 2026-02-23 | Added team name validation to reject numeric-only team names |
 | 2026-02-23 | Fixed SAFE prediction bug: KOE vs TSG 0:0 was SAFE due to 82.2% raw but 73.1% calibrated - now uses calibrated probability for decision criteria |
+| 2026-02-24 | Added pattern detection system with streak, form, day-of-week, bounce-back, and block time trend analysis |
